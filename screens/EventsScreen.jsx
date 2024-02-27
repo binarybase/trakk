@@ -22,7 +22,7 @@ const EventItem = memo(({ item, selection, panToPointMarker, styles }) => {
 			]}
 		>
 			<View style={{ width: 100 }}>
-				<Text style={styles.text.base}>{formatDateTime(item.serverTime)}</Text>
+				<Text style={styles.text.base}>{formatDateTime(item.serverTime || item.eventTime)}</Text>
 			</View>
 			<View>
 				<Text style={styles.text.base}>{item.type}</Text>

@@ -99,26 +99,26 @@ export default Login = () => {
 		>
 			<View style={[styles.content.normal, { alignItems: "center", justifyContent: "center", flex: 1 }]}>
 				<FontAwesomeIcon icon={faLocationArrow} size={32} style={styles.text.h1} />
-				<Text style={styles.heading}>Trakk</Text>
+				<Text style={[styles.heading, { marginBottom: 55 }]}>Trakk</Text>
 				{hasError === true && (
 					<Text style={styles.text.note}>{errorText}</Text>	
 				)}
 				<TextInput
-					style={[styles.input.large, {textAlign: "center"}]}
+					style={styles.input.large}
 					placeholder={emailText}
 					autoFocus={true}
 					onChangeText={(v) => setInputEmail(v)}
 					value={inputEmail}
 				/>
 				<TextInput
-					style={[styles.input.large, {textAlign: "center"}]}
+					style={styles.input.large}
 					placeholder={pwText}
 					secureTextEntry={true}
 					onSubmitEditing={doLoginProcess}
 					onChangeText={(v) => setInputPw(v)}
 					value={inputPw}
 				/>
-				<TouchableOpacity style={[styles.btn.btn, styles.btn.primary, loading ? styles.btn.disabled : null, { width: 150 }]} onPress={doLoginProcess} disabled={loading}>
+				<TouchableOpacity style={[styles.btn.btn, styles.btn.primary, loading ? styles.btn.disabled : null, { width: 150, marginTop: 15 }]} onPress={doLoginProcess} disabled={loading}>
 					<Text style={styles.btn.primaryText}>{loading ? loggingInText : loginText}</Text>
 				</TouchableOpacity>
 			</View>

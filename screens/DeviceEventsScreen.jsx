@@ -115,7 +115,7 @@ export default DeviceEventsScreen = ({ navigation, route }) => {
 		<>
 			<View style={styles.flatListItem}>
 				<View style={{ width: 100 }}>
-					<Text style={styles.text.base}>{formatDateTime(item.serverTime)}</Text>
+					<Text style={styles.text.base}>{formatDateTime(item.serverTime || item.eventTime)}</Text>
 				</View>
 				<View style={{ width: 140 }}>
 					<Text style={styles.text.base}>{item.type}</Text>

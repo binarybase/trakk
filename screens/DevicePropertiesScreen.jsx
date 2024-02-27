@@ -5,6 +5,7 @@ import { formatDateTime } from '../lib/date';
 import { isBool } from '../lib/util';
 import { useDeviceProperty } from '../lib/hooks/useDeviceProperty';
 import DeviceInfoContext from '../lib/context/deviceInfoContext';
+import { formatProperty, formatSpeed } from '../lib/formatter';
 
 export default DevicePropertiesScreen = ({ navigation, route }) => {
 	const { device } = useContext(DeviceInfoContext);
@@ -29,7 +30,13 @@ export default DevicePropertiesScreen = ({ navigation, route }) => {
 			...s.text.base,
 			fontWeight: 'bold',
 			minWidth: 150,
-			textAlign: 'right'
+			textAlign: 'right',
+			borderBottomWidth: 1
+		},
+		editable: {
+			...s.input.text,
+			width: '100%',
+			marginBottom: 0
 		}
 	}));
 
@@ -38,17 +45,19 @@ export default DevicePropertiesScreen = ({ navigation, route }) => {
 	// properties that can be changed via API
 	const [ name, setName ] = useDeviceProperty(device, "name");
 	const [ model, setModel ] = useDeviceProperty(device, "model");
+	const [ phone, setPhone ] = useDeviceProperty(device, "phone");
 
 	return (
 		<ScrollView style={styles.view} contentInsetAdjustmentBehavior="automatic">
 			<View style={styles.ul}>
 				<View style={styles.li}>
-					<Text style={styles.propText}>Název</Text>
-					<TextInput style={styles.valueText} value={name} onChangeText={setName} />
+					<TextInput style={styles.editable} value={name} onChangeText={setName} autoFocus={true} />
 				</View>
 				<View style={styles.li}>
-					<Text style={styles.propText}>SPZ</Text>
-					<TextInput style={styles.valueText} value={model} onChangeText={setModel} />
+					<TextInput style={styles.editable} value={model} placeholder={"SPZ"} onChangeText={setModel} />
+				</View>
+				<View style={styles.li}>
+					<TextInput style={styles.editable} value={phone} placeholder={"Tel. číslo"} onChangeText={setPhone} />
 				</View>
 				<View style={styles.li}>
 					<Text style={styles.propText}>Stav</Text>
@@ -61,10 +70,6 @@ export default DevicePropertiesScreen = ({ navigation, route }) => {
 				<View style={styles.li}>
 					<Text style={styles.propText}>Poslední aktualizace</Text>
 					<Text style={styles.valueText}>{formatDateTime(device.lastUpdate)}</Text>
-				</View>
-				<View style={styles.li}>
-					<Text style={styles.propText}>Tel. číslo</Text>
-					<Text style={styles.valueText}>{device.phone}</Text>
 				</View>
 				<View style={[styles.li, { flexDirection: 'column' }]}>
 					<Text style={styles.propText}>Poslední poloha</Text>
@@ -88,12 +93,12 @@ export default DevicePropertiesScreen = ({ navigation, route }) => {
 				</View>
 				<View style={styles.li}>
 					<Text style={styles.propText}>Rychlost</Text>
-					<Text style={styles.valueText}>{device.position?.speed ?? ''}</Text>
+					<Text style={styles.valueText}>{formatSpeed(device.position?.speed || 0)}</Text>
 				</View>
 				{Object.keys(device.position?.attributes || {}).map((k, index) => (
 					<View style={styles.li} key={index}>
 						<Text style={styles.propText}>{k}</Text>
-						<Text style={styles.valueText}>{device.position.attributes[k]}</Text>
+						<Text style={styles.valueText}>{formatProperty(k, device.position.attributes[k])}</Text>
 					</View>
 				))}
 			</View>

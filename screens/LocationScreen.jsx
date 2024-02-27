@@ -13,12 +13,8 @@ import { debug } from '../lib/logger';
 
 const MODULE = 'LocationScreen';
 const HEADER_TITLE = "Trakk";
-let watchId;
+
 let markerIdCache = [];
-const clearWatchId = () => {
-	watchId && clearInterval(watchId);
-	watchId = null;
-}
 
 export default () => {
 	const { loggedIn } = useAuthContext();
@@ -63,10 +59,17 @@ export default () => {
 	useFocusedTabEffect(isFocused => {
 		isFocused && setDefaultHeader();
 	})
+
+	// set default header on load
+	useEffect(() => {
+		setDefaultHeader();
+	}, []);
+
 	// pan to device when changes
 	useEffect(() => {
 		if(!currentDevice || !currentDevice.position) return;
 		//mapViewRef.current?.fitToSuppliedMarkers([ currentDevice?.identifier ])
+		debug(MODULE, 'animateToRegion when device changed');
 		mapViewRef.current?.animateToRegion({
 			latitude: currentDevice.position.latitude,
 			longitude: currentDevice.position.longitude,
@@ -75,36 +78,6 @@ export default () => {
 		})
 	}, [ currentDevice ]);
 
-	/**
-	 * creates devices watcher
-	 */
-	const watchDevices = () => {
-		// clear on startup if called multiple times
-		watchId && clearInterval(watchId);
-		// load positions and fit to them
-		debug(MODULE, 'starting watchDevices');
-		update().then(devices => {
-			// error
-			if(devices === null){
-				setHeaderTitle("Připojování...");
-				return;
-			}
-			setDefaultHeader();
-
-			if(!devices) return;
-
-			const markerIds = devices.map(d => d.identifier);
-			if(!markerIds.length)
-				return;
-
-			mapViewRef.current?.fitToSuppliedMarkers(markerIds);
-			markerIdCache = markerIds;
-		})
-
-		// set watcher
-		watchId = setInterval(update, 10000);
-	}
-
 	// update pinned device when positions changed
 	useEffect(() => {
 		if(pinnedDevice){
@@ -112,7 +85,7 @@ export default () => {
 			// actually pinned device contains old position object
 			const position = devices.find(d => d.id === pinnedDevice.id)?.position;
 			if(position){
-				debug(MODULE, 'updatePositions: pan to', pinnedDevice?.identifier, position.latitude, position.longitude);
+				//debug(MODULE, 'updatePositions: pan to', pinnedDevice?.identifier, position.latitude, position.longitude);
 				mapViewRef.current?.animateToRegion({
 					latitude: position.latitude,
 					longitude: position.longitude,
@@ -127,15 +100,33 @@ export default () => {
 	useEffect(() => {
 		// do not execute when logged out
 		if(!loggedIn){
-			clearWatchId();
 			return;
 		}
 
-		watchDevices();
+		// load positions and fit to them
+		debug(MODULE, 'starting watchDevices');
+
+		// update devices on startup / auth status change
+		update().then(devices => {
+			// error
+			if(!devices){
+				return;
+			}
+
+			const markerIds = devices.map(d => d.identifier);
+			if(!markerIds.length)
+				return;
+
+			mapViewRef.current?.fitToSuppliedMarkers(markerIds);
+			markerIdCache = markerIds;
+		})
+
+		// set watcher
+		const watchId = setInterval(update, 10000);
 
 		// clear watchers on refresh
 		return () => {
-			clearWatchId();
+			clearInterval(watchId);
 		}
 	}, [ loggedIn, isTestEnabled ]);
 
@@ -148,8 +139,9 @@ export default () => {
 			ref={mapViewRef}
 			style={styles.map}
 			initialRegion={{
-				latitude: 48.565,
-				longitude: 14.566,
+				//14.1036266&y=49.5783732
+				latitude: 49.5783732,
+				longitude: 14.1036266,
 				latitudeDelta: LATITUDE_DELTA,
 				longitudeDelta: LONGITUDE_DELTA
 			}}

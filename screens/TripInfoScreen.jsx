@@ -2,7 +2,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { useStyles } from '../style/useStyles';
 import { ScrollView, View, Text } from 'react-native';
 import { useEffect } from 'react';
-import { formatDateTime } from '../lib/date';
+import { formatProperty } from '../lib/formatter';
 
 export default TripInfoScreen = ({ navigation, route }) => {
 	const { trip } = route.params;
@@ -45,7 +45,7 @@ export default TripInfoScreen = ({ navigation, route }) => {
 					return (
 						<View style={styles.li} key={index}>
 							<Text style={styles.propText}>{k}</Text>
-							<Text style={styles.valueText}>{trip[k]}</Text>
+							<Text style={styles.valueText}>{formatProperty(k, trip[k])}</Text>
 						</View>
 					)
 				})}

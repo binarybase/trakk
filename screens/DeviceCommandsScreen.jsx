@@ -88,10 +88,12 @@ export default DeviceCommands = () => {
 				alert("Odeslání příkazu selhalo.");
 			}
 		})
-	}, [ value ]);
+	}, [ value, device ]);
 
 	// construct hook to update
 	useEffect(() => {
+		if(!device) return;
+
 		const params = (new URLSearchParams({
 			deviceId: device.id,
 			type: "commandResult"
@@ -108,14 +110,16 @@ export default DeviceCommands = () => {
 			try {
 				const events = (await get(`reports/events?${query}`))?.data || [];
 				// append
+				// since traccar 5.X is eventTime insteadOf serverTime
+
 				setCommands(cmds => {
 					// filter out events that doesnt exists yet in list
 					const eventsToAdd = events.filter(
 						event => event.type == 'commandResult' &&
 						!isEmpty(event.attributes?.result) &&
-						cmds.findIndex(cmd => cmd.ts === +(new Date(event.serverTime))) === -1
+						cmds.findIndex(cmd => cmd.ts === +(new Date(event.serverTime || event.eventTime))) === -1
 					).map(event => ({
-						ts: +(new Date(event.serverTime)),
+						ts: +(new Date(event.serverTime || event.eventTime)),
 						type: 'recv',
 						value: event.attributes.result
 					}));
@@ -143,7 +147,7 @@ export default DeviceCommands = () => {
 		return () => {
 			clearInterval(id);
 		}
-	}, []);
+	}, [ device ]);
 
 	return (
 		<View style={styles.view}>

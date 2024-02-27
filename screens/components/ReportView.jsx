@@ -48,7 +48,10 @@ export default ReportView = ({
 		},
 		empty: {
 			flex: 1,
-			padding: 10
+			padding: 10,
+			flexDirection: 'row',
+			alignItems: 'center',
+			justifyContent: 'center'
 		},
 		loading: {
 			position: 'absolute',
@@ -76,6 +79,11 @@ export default ReportView = ({
 		refreshText: {
 			...s.text.base,
 			alignSelf: 'center'
+		},
+		loadMoreLinkText: {
+			...s.text.base,
+			alignSelf: 'center',
+			color: s.colors.blue.primary
 		},
 		overlay: {
 			flex: 1,
@@ -112,19 +120,29 @@ export default ReportView = ({
 	
 	// state
 	const [ currentDatePart, setCurrentDatePart ] = useState(STARTING_DATE_PART);
-	const [ currentDate, setCurrentDate ] = useState(getYearMonthRange(undefined, STARTING_DATE_PART));
-	const [ downloading, setDownloading ] = useState(false);
-	const [ loading, setLoading ] = useState();
-	const [ error, setError ] = useState();
+	const [ currentDate, setCurrentDate ] = useState(getYearMonthRange(undefined));
 	const [ trips, setTrips ] = useState([]);
 	const [ selection, setSelection ] = useState();
 	const [ selectionCoords, setSelectionCoords ] = useState([]);
 	const [ selectionPoint, setSelectionPoint ] = useState();
 	const [ loadingCoords, setLoadingCoords ] = useState(false);
 	const [ displayPicker, setDisplayPicker ] = useState(false);
+	
+	const [ downloading, setDownloading ] = useState(false);
+	const [ error, setError ] = useState();
+
+	// first loading when device has been set
+	const [ loading, setLoading ] = useState();
+	// loading more when end reached
 	const [ loadingMore, setLoadingMore ] = useState(false);
+	// refreshing pull-to-refresh
 	const [ refreshing, setRefreshing ] = useState(false);
-	const [ canLoadMore, setCanLoadMore ] = useState(true);
+	// can do PTR
+	const [ canRefresh, setCanRefresh ] = useState(false);
+	// can load more on end
+	const [ canLoadMore, setCanLoadMore ] = useState(false);
+	// force load more when no data received
+	const [ forceLoadMore, setForceLoadMore ] = useState(false);
 	
 	const currentDevicePosition = devices?.find(d => d.id === currentDevice?.id)?.position || currentDevice?.position || {};
 	const pruneTrips = (newTrips, oldTrips) => newTrips.filter(t1 => oldTrips.findIndex(t2 => keyExtractor(t2) === keyExtractor(t1)) === -1);
@@ -177,7 +195,7 @@ export default ReportView = ({
 		} catch(ex){
 			console.error('downloadReport failed', ex);
 			alert("Stažení selhalo");
-		} finally{
+		} finally {
 			// modal should be closed before share dialog opens
 			// if finally with close is used, it closes also share dialog
 			setDownloading(false);
@@ -218,29 +236,6 @@ export default ReportView = ({
 	}, [ currentDevice ]);
 	
 	/**
-	 * loads trips for the month and its first week
-	*/
-	const loadTrips = useCallback(async () => {
-		setError(null);
-		setLoading(true);
-		
-		try {
-			setTrips(await fetchTrips(currentDate));
-			mapViewRef?.current?.animateToRegion([{
-				latitude: currentDevice.position.latitude,
-				longitude: currentDevice.position.longitude,
-				latitudeDelta: 0.01,
-				longitudeDelta: 0.01
-			}]);
-		} catch(ex){
-			error(MODULE, 'fetchTrips failed', ex);
-			setError(TEXT_LOADING_FAILED);
-		} finally {
-			setLoading(false);
-		}
-	}, [ currentDevice, currentDate ]);
-	
-	/**
 	 * when month changes, it will load new trips from first week of the month
 	 */
 	const onMonthPickerChange = useCallback((e, date) => {
@@ -249,24 +244,22 @@ export default ReportView = ({
 		
 		// update date only when user changed previous date
 		if(e !== ACTION_DATE_SET)
-		return;
+			return;
 		
 		setCurrentDatePart(STARTING_DATE_PART);
-		setCurrentDate(getYearMonthRange(date, STARTING_DATE_PART));
+		setCurrentDate(getYearMonthRange(date));
 	}, []);
 	
 	/**
 	 * handles refresh control
 	*/
 	const onRefresh = useCallback(() => {
-		if(loadingMore) return;
+		if(!canRefresh || refreshing) return;
 		debug(MODULE, 'refreshing data', currentDate);
-		// already refreshing
-		if(refreshing || !currentDate || !currentDate.isCurrentMonth) return;
 
 		// async looper
 		const loopAsync = async () => {
-			debug(MODULE, 'latest', getLatestDate(), currentDate.lastDayOfMonth);
+			//debug(MODULE, 'latest', getLatestDate(), currentDate.lastDayOfMonth);
 			const dateNow = new Date();
 			const latest = getLatestDate() || currentDate.firstDayOfMonth;
 			if(!latest){
@@ -279,17 +272,16 @@ export default ReportView = ({
 			for(let i = whichMonthPart(latest), len = whichMonthPart(dateNow); i <= len; i++){
 				const refreshRange = getYearMonthRange(latest, i);
 				try {
-					log(MODULE, 'refreshing since', refreshRange.firstDay, '->', refreshRange.lastDay, 'range id', i);
-					const newRecords = await fetchTrips({
-						firstDay: refreshRange.firstDay,
-						lastDay: refreshRange.lastDay
-					}, CACHE_METHOD.PREFER_NETWORK);
-				
-					log(MODULE, 'new data', newRecords.length, 'records');
-
-					const pruned = pruneTrips(newRecords, trips);
-					console.log(pruned.map(keyExtractor));
-					setTrips([...pruned, ...trips]);
+					log(MODULE, 'refreshing since', refreshRange.firstDay, '->', refreshRange.lastDay);
+					const newRecords = await fetchTrips(refreshRange, CACHE_METHOD.PREFER_NETWORK);
+					setTrips(trips => {
+						const pruned = pruneTrips(newRecords, trips);
+	
+						return [
+							...pruned,
+							...trips
+						]
+					});
 				} catch(ex){
 					warn(MODULE, 'refreshing exception', ex);
 				}
@@ -301,7 +293,7 @@ export default ReportView = ({
 		// execute async loop
 		loopAsync();
 
-	}, [ currentDevice, currentDate, refreshing, trips, loadingMore ]);
+	}, [ currentDevice, currentDate, refreshing, canRefresh ]);
 	
 	// load trips when device changes
 	useEffect(() => {
@@ -317,8 +309,39 @@ export default ReportView = ({
 			return;
 		}
 		
-		if(!currentDevice || !currentDate) return;
-		
+		if(!currentDevice || !currentDate) return;		
+		debug(MODULE, performance.now(), 'Device has been changed - id: ', currentDevice.id, 'date: ', currentDate.firstDay);
+
+		const loadTrips = async () => {
+			setError(null);
+			setLoading(true);
+			
+			try {
+				const range = getYearMonthRange(currentDate.firstDay, STARTING_DATE_PART);
+				const trips = await fetchTrips(range);
+				setTrips(trips);
+
+				if(currentDevice && currentDevicePosition){
+					mapViewRef?.current?.animateToRegion([{
+						latitude: currentDevicePosition.latitude,
+						longitude: currentDevicePosition.longitude,
+						latitudeDelta: 0.01,
+						longitudeDelta: 0.01
+					}]);
+				}
+			} catch(ex){
+				warn(MODULE, 'fetchTrips failed', ''+ex);
+				setError(TEXT_LOADING_FAILED);
+			} finally {
+				// stopped loading of the main part
+				setLoading(false);
+				// make onEndReached handler working
+				setCanLoadMore(true);
+				// make refresh working
+				setCanRefresh(true);
+			}
+		}
+
 		// load trips
 		loadTrips();
 		
@@ -327,48 +350,22 @@ export default ReportView = ({
 			setCurrentDatePart(STARTING_DATE_PART);
 			setTrips([]);
 			setSelection(null);
-			setCanLoadMore(true);
+			setCanRefresh(false);
+			setCanLoadMore(false);
+			setForceLoadMore(false);
 		}
 		
 	}, [ currentDevice, currentDate ]);
 
-	/**
-	 * starts loading of the previous week
-	 */
-	useEffect(() => {
-		// execute only when loading more is requested and can load more data
-		if(!loadingMore || !canLoadMore) return;
-
-		// load previous week and append data to existing
-		const prevWeek = getYearMonthRange(currentDate.firstDay, currentDatePart);
-
-		debug(MODULE, 'loading more range', currentDatePart, '/', 3, prevWeek.firstDay, prevWeek.lastDay);
-		fetchTrips(prevWeek).then(prevWeekData => {
-			// no additional data available
-			if(currentDatePart <= 0){
-				setCanLoadMore(false);
-			}
-
-			// append prev week data to the end of the list
-			if(!prevWeekData.length) return;
-			setTrips([...trips, ...(pruneTrips(prevWeekData, trips))]);
-		}).finally(() => {
-			// iterate over until we get the past
-			if(prevWeek.isFuture){
-				setCurrentDatePart(currentDatePart - 1);
-				return;
-			}
-
-			setLoadingMore(false);
-		})
-
-	}, [ canLoadMore, loadingMore, currentDatePart ]);
-	
 	// update header when tab changes
 	useFocusedTabEffect(isFocused => {
 		if(!isFocused) return;
 		setHeaderTitle(`${reportTitle} - ${currentDevice?.name}`);
 		setHeaderRight(() => () => <RightIconComponent />);
+		
+		//if(!currentDevice) return;
+		//log(MODULE, 'ReportView focused, loading on focus');
+		//loadTrips();
 	}, [ currentDevice ]);
 	
 	/**
@@ -427,8 +424,9 @@ export default ReportView = ({
 	const FooterListComponent = useMemo(() => loadingMore && (
 		<View style={styles.empty}>
 			<ActivityIndicator size={"small"} />
+			<Text style={[styles.text.base, { paddingLeft: 10 }]}>Načítání předchozího týdne...</Text>
 		</View>
-	), [ loadingMore ]);
+	), [ loadingMore, currentDatePart ]);
 	// displayed when list is empty
 	const EmptyListComponent = useMemo(() => !loadingMore && (
 		<View style={styles.empty}>
@@ -452,21 +450,62 @@ export default ReportView = ({
 	 * loads next week when end of the list has been reached (load more)
 	 * when end is reached also refreshes the last cached response
 	 */
-	const onEndReached = useCallback(() => {
-		debug(MODULE, 'onEndReached', currentDatePart);
-		// already loading
-		if(loadingMore || currentDatePart <= 0){
-			setLoadingMore(false);
-			setCurrentDatePart(0);
-			debug(MODULE, 'onEndReached: skipping load');
+	const onEndReached = useCallback(async () => {
+		// skip if already loading
+		if(!canLoadMore || loading || loadingMore)
+			return;
+
+		debug(MODULE, 'onEndReached', 'currentDatePart', currentDatePart);
+
+		// beginning of the week reached
+		if(currentDatePart <= 0){
+			debug(MODULE, 'onEndReached', 'beginning of the week reached');
+			setCanLoadMore(false);
 			return;
 		}
 
 		// move to previous week
-		setCurrentDatePart(currentDatePart - 1);
+		// display loading more...
 		setLoadingMore(true);
-	}, [ loadingMore, currentDatePart ]);
+		// disable refreshing when already loading over weeks
+		setCanRefresh(false);
 
+		// load previous week and append data to existing
+		const prevWeekPart = currentDatePart - 1;
+		const prevWeek = getYearMonthRange(currentDate.firstDay, prevWeekPart);
+		let shouldForceLoadMore = false;
+
+		debug(MODULE, 'onEndReached: loading range', prevWeekPart, '/', 3, prevWeek.firstDay, prevWeek.lastDay);
+		try {
+			const prevWeekData = await fetchTrips(prevWeek);
+			// move to previous week
+			setCurrentDatePart(prevWeekPart);
+
+			if(prevWeekData.length){
+				// append prev week data to the end of the list
+				setTrips(trips => ([...trips, ...(pruneTrips(prevWeekData, trips))]));
+			} else {
+				debug(MODULE, 'onEndReached: no data received, forcing load more');
+				shouldForceLoadMore = true;
+			}
+
+		} catch (ex) {
+			warn(MODULE, `onEndReached: load more failed with exception ${ex}`);
+		} finally {
+			setLoadingMore(false);
+			setCanRefresh(true);
+			debug(MODULE, 'onEndReached: finished');
+
+			if(shouldForceLoadMore){
+				setForceLoadMore(true);
+			}
+		}
+	}, [ canLoadMore, loading, loadingMore, currentDatePart ]);
+
+	useEffect(() => {
+		if(!forceLoadMore) return;
+		onEndReached();
+	}, [ forceLoadMore ]);
 
 	return loading || error ? (
 		<LoadingView error={error} />
@@ -484,7 +523,7 @@ export default ReportView = ({
 					showsTraffic={true}
 					zoomEnabled={true}
 				>
-					{currentDevice && <DeviceMarker device={{
+					{currentDevice && currentDevicePosition && <DeviceMarker device={{
 						...currentDevice,
 						position: currentDevicePosition,
 						moving: isDeviceMoving({
@@ -517,10 +556,9 @@ export default ReportView = ({
 				renderItem={tripItemRenderer}
 				ListEmptyComponent={EmptyListComponent}
 				ListFooterComponent={FooterListComponent}
-				onEndReachedThreshold={1}
-				onEndReached={onEndReached}
 				refreshing={refreshing}
 				onRefresh={onRefresh}
+				onEndReached={onEndReached}
 			/>
 			{displayPicker && <MonthPicker
 				onChange={onMonthPickerChange}
