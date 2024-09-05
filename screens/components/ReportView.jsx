@@ -24,6 +24,7 @@ const TEXT_LOADING_FAILED = "Načítání selhalo";
 const keyExtractor = t => t?.startTime;
 
 export default ReportView = ({
+	downloadReportType,
 	reportType = "trips",
 	reportTitle = "Trasy",
 	reportItemRenderer,
@@ -144,12 +145,14 @@ export default ReportView = ({
 	// force load more when no data received
 	const [ forceLoadMore, setForceLoadMore ] = useState(false);
 	
-	const currentDevicePosition = devices?.find(d => d.id === currentDevice?.id)?.position || currentDevice?.position || {};
-	const pruneTrips = (newTrips, oldTrips) => newTrips.filter(t1 => oldTrips.findIndex(t2 => keyExtractor(t2) === keyExtractor(t1)) === -1);
-	const getLatestDate = () => {
+	const currentDevicePosition = useMemo(() => devices?.find(d => d.id === currentDevice?.id)?.position || currentDevice?.position || {}, [ currentDevice, devices ]);
+
+	const pruneTrips = useCallback((newTrips, oldTrips) => newTrips.filter(t1 => oldTrips.findIndex(t2 => keyExtractor(t2) === keyExtractor(t1)) === -1), []);
+
+	const getLatestDate = useCallback(() => {
 		const maxDate = Math.max(...trips.map(t => +new Date(keyExtractor(t))));
 		return !isNaN(maxDate) && maxDate > 0 ? new Date(maxDate) : null;
-	}
+	}, [ trips ]);
 
 	/**
 	 * downloads Excel report from Traccar
@@ -167,7 +170,7 @@ export default ReportView = ({
 
 		try {
 			// download using RnFetchBlob
-			const response = await download(`reports/${reportType}?${params.toString()}`, reportFile);
+			const response = await download(`reports/${downloadReportType || reportType}?${params.toString()}`, reportFile);
 			if(!response){
 				alert('Stažení selhalo - soubor neobsahuje žádná data');
 				return;
@@ -206,7 +209,7 @@ export default ReportView = ({
 	 * 
 	 * @param {Object} coords {lat, lng} coordinates
 	 */
-	const panToPointMarker = (coords) => {
+	const panToPointMarker = useCallback((coords) => {
 		if(!coords) return;
 		setSelectionPoint(coords);
 		mapViewRef.current?.animateToRegion({
@@ -214,7 +217,7 @@ export default ReportView = ({
 			latitudeDelta: 0.05,
 			longitudeDelta: 0.05
 		});
-	}
+	}, [ mapViewRef ]);
 
 	
 	/**
