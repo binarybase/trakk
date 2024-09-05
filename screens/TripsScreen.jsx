@@ -46,7 +46,7 @@ export default ({ navigation }) => {
 
 	return (
 		<ReportView
-			reportType="trips"
+			reportType="cachedTrips.php"
 			reportTitle="Trasy"
 			reportItemRenderer={itemRenderer}
 		/>

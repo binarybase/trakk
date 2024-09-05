@@ -295,6 +295,42 @@ export default ReportView = ({
 
 	}, [ currentDevice, currentDate, refreshing, canRefresh ]);
 	
+	const loadTrips = async () => {
+		setError(null);
+		setLoading(true);
+		
+		try {
+			const range = getYearMonthRange(currentDate.firstDay, STARTING_DATE_PART);
+			const trips = await fetchTrips(range);
+			setTrips(trips);
+
+			// try to refresh when no data received
+			if(!trips.length){
+				onRefresh();
+			}
+
+			if(currentDevice && currentDevicePosition){
+				log(MODULE, 'animateToRegion', currentDevicePosition.latitude, currentDevicePosition.longitude);
+				mapViewRef?.current?.animateToRegion([{
+					latitude: currentDevicePosition.latitude,
+					longitude: currentDevicePosition.longitude,
+					latitudeDelta: 0.01,
+					longitudeDelta: 0.01
+				}]);
+			}
+		} catch(ex){
+			warn(MODULE, 'fetchTrips failed', ''+ex);
+			setError(TEXT_LOADING_FAILED);
+		} finally {
+			// stopped loading of the main part
+			setLoading(false);
+			// make onEndReached handler working
+			setCanLoadMore(true);
+			// make refresh working
+			setCanRefresh(true);
+		}
+	}
+
 	// load trips when device changes
 	useEffect(() => {
 		// reset date part to zero
@@ -311,36 +347,6 @@ export default ReportView = ({
 		
 		if(!currentDevice || !currentDate) return;		
 		debug(MODULE, performance.now(), 'Device has been changed - id: ', currentDevice.id, 'date: ', currentDate.firstDay);
-
-		const loadTrips = async () => {
-			setError(null);
-			setLoading(true);
-			
-			try {
-				const range = getYearMonthRange(currentDate.firstDay, STARTING_DATE_PART);
-				const trips = await fetchTrips(range);
-				setTrips(trips);
-
-				if(currentDevice && currentDevicePosition){
-					mapViewRef?.current?.animateToRegion([{
-						latitude: currentDevicePosition.latitude,
-						longitude: currentDevicePosition.longitude,
-						latitudeDelta: 0.01,
-						longitudeDelta: 0.01
-					}]);
-				}
-			} catch(ex){
-				warn(MODULE, 'fetchTrips failed', ''+ex);
-				setError(TEXT_LOADING_FAILED);
-			} finally {
-				// stopped loading of the main part
-				setLoading(false);
-				// make onEndReached handler working
-				setCanLoadMore(true);
-				// make refresh working
-				setCanRefresh(true);
-			}
-		}
 
 		// load trips
 		loadTrips();
@@ -363,10 +369,10 @@ export default ReportView = ({
 		setHeaderTitle(`${reportTitle} - ${currentDevice?.name}`);
 		setHeaderRight(() => () => <RightIconComponent />);
 		
-		//if(!currentDevice) return;
+		//if(!currentDevice || !currentDevicePosition) return;
 		//log(MODULE, 'ReportView focused, loading on focus');
-		//loadTrips();
-	}, [ currentDevice ]);
+		//onRefresh();
+	}, [ currentDevice, currentDevicePosition ]);
 	
 	/**
 	 * loads route points and renders on the map based on selected list item
