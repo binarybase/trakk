@@ -17,7 +17,7 @@ PODS:
   - libevent (2.1.12)
   - MMKV (1.2.13):
     - MMKVCore (~> 1.2.13)
-  - MMKVCore (1.2.14)
+  - MMKVCore (1.2.16)
   - RCT-Folly (2021.07.22.00):
     - boost
     - DoubleConversion
@@ -585,7 +585,7 @@ SPEC CHECKSUMS:
   hermes-engine: 34c863b446d0135b85a6536fa5fd89f48196f848
   libevent: 4049cae6c81cdb3654a443be001fb9bdceff7913
   MMKV: aac95d817a100479445633f2b3ed8961b4ac5043
-  MMKVCore: 89f5c8a66bba2dcd551779dea4d412eeec8ff5bb
+  MMKVCore: 9cfef4c48c6c46f66226fc2e4634d78490206a48
   RCT-Folly: 424b8c9a7a0b9ab2886ffe9c3b041ef628fd4fb1
   RCTRequired: f6187ec763637e6a57f5728dd9a3bdabc6d6b4e0
   RCTTypeSafety: a01aca2dd3b27fa422d5239252ad38e54e958750
