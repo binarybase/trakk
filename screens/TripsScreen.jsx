@@ -2,7 +2,7 @@ import { TouchableOpacity, View, Text } from "react-native";
 import ReportView from "./components/ReportView";
 import { formatDistance, formatDistanceKm, formatSpeed } from '../lib/formatter';
 import { durationBetweenDates, formatDateTime, formatDuration } from "../lib/date";
-import { memo } from "react";
+import { memo, useCallback } from "react";
 
 const TripItem = memo(({ navigate, item, selection, setSelection, currentDevice, styles }) => {
 	const onItemLongPress = () => {
@@ -41,12 +41,12 @@ const TripItem = memo(({ navigate, item, selection, setSelection, currentDevice,
 });
 
 export default ({ navigation }) => {
-	const navigate = navigation.navigate;
-	const itemRenderer = (props) => <TripItem {...props} navigate={navigate} />;
+	const itemRenderer = useCallback((props) => <TripItem {...props} navigate={navigation.navigate} />, [ navigation ]);
 
 	return (
 		<ReportView
 			reportType="cachedTrips.php"
+			downloadReportType={"trips"}
 			reportTitle="Trasy"
 			reportItemRenderer={itemRenderer}
 		/>

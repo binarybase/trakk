@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createAuthContext } from './lib/context/authContext';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
@@ -20,7 +20,7 @@ const App = () => {
 	const [ styles ]= useStyles();
 	const theme = useColorScheme();
 
-	const Theme = {
+	const Theme = useMemo(() => ({
 		...DefaultTheme,
 		colors: {
 			...DefaultTheme.colors,
@@ -32,7 +32,7 @@ const App = () => {
 			notification: styles.bg,
 			dark: theme === 'dark'
 		}
-	}
+	}), [ theme, styles ]);
 
 	return (
 		<AuthContext.Provider value={authContextValue}>
