@@ -169,7 +169,7 @@ export const DeviceItem = memo(({ navigate, device, color, focused, isEngineBloc
 					</View>
 				)}
 
-				{odometer && (
+				{(odometer > 0) && (
 					<View style={styles.deviceDetail}>
 						<FontAwesomeIcon icon={faRulerHorizontal} color={styles.fg} size={ICON_SIZE} />
 						<Text numberOfLines={1} style={styles.deviceDetailText}>{formatDistance(odometer)}</Text>
