@@ -296,7 +296,7 @@ export default ReportView = ({
 		// execute async loop
 		loopAsync();
 
-	}, [ currentDevice, currentDate, refreshing, canRefresh ]);
+	}, [ currentDevice, currentDate, refreshing, canRefresh, getLatestDate ]);
 	
 	const loadTrips = async () => {
 		setError(null);
@@ -309,7 +309,7 @@ export default ReportView = ({
 
 			// try to refresh when no data received
 			if(!trips.length){
-				onRefresh();
+				//onRefresh();
 			}
 
 			if(currentDevice && currentDevicePosition){
@@ -418,6 +418,14 @@ export default ReportView = ({
 		})
 	}, [ selection ]);
 	
+
+	useEffect(() => {
+		if(trips.length)
+			return;
+
+		onRefresh();
+	}, [ trips ]);
+
 	// action buttons
 	const RightIconComponent = useCallback(() => (
 		<View style={{ flexDirection: 'row' }}>

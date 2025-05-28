@@ -11,6 +11,7 @@ import 'react-native-gesture-handler';
 import { useStyles } from './style/useStyles';
 import { useColorScheme } from 'react-native';
 import TripInfoScreen from './screens/TripInfoScreen';
+import { createDevicesContext } from './lib/context/devicesContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,6 +20,8 @@ const App = () => {
 	const { connected, loggedIn } = authContextValue;
 	const [ styles ]= useStyles();
 	const theme = useColorScheme();
+	const devicesContext = createDevicesContext();
+	const { DevicesContext } = devicesContext;
 
 	const Theme = useMemo(() => ({
 		...DefaultTheme,
@@ -36,6 +39,7 @@ const App = () => {
 
 	return (
 		<AuthContext.Provider value={authContextValue}>
+			<DevicesContext.Provider value={devicesContext}>
 			<NavigationContainer theme={Theme}>
 				<Stack.Navigator>
 					{
@@ -59,6 +63,7 @@ const App = () => {
 					}
 				</Stack.Navigator>
 			</NavigationContainer>
+			</DevicesContext.Provider>
 		</AuthContext.Provider>
 	)
 }

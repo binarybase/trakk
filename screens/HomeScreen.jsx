@@ -14,7 +14,6 @@ import { faRoad } from '@fortawesome/free-solid-svg-icons/faRoad';
 import { faCircleStop } from '@fortawesome/free-solid-svg-icons/faCircleStop';
 
 import { useStyles } from '../style/useStyles';
-import { createDevicesContext } from '../lib/context/devicesContext';
 import { useCallback, useState } from 'react';
 import { AppContext } from '../lib/context/appContext';
 import { createTabNavigatorContext } from '../lib/hooks/useFocusedTab';
@@ -68,8 +67,6 @@ const TabNavigator = () => {
 
 export default () => {
 	const theme = useColorScheme();
-	const devicesContext = createDevicesContext();
-	const { DevicesContext } = devicesContext;
 	const [ headerLeft, setHeaderLeft] = useState();
 	const [ headerTitle, setHeaderTitle ] = useState();
 	const [ headerRight, setHeaderRight ] = useState();
@@ -83,26 +80,24 @@ export default () => {
 			headerRight,
 			setHeaderRight
 		}}>
-			<DevicesContext.Provider value={devicesContext}>
-				<Drawer.Navigator
-					drawerContent={(props) => <LeftPanel {...props} />}
-				>
-					<Drawer.Screen
-						name="Trakk"
-						component={TabNavigator}
-						options={{
-							swipeEnabled: true,
-							headerTitle,
-							headerRight,
-							headerTransparent: true,
-							headerBackgroundContainerStyle: {
-								backgroundColor: theme === 'light' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.44)'
-							},
-							...(headerLeft === false ? { headerLeft: null } : {})
-						}}
-					/>
-				</Drawer.Navigator>
-			</DevicesContext.Provider>
+			<Drawer.Navigator
+				drawerContent={(props) => <LeftPanel {...props} />}
+			>
+				<Drawer.Screen
+					name="Trakk"
+					component={TabNavigator}
+					options={{
+						swipeEnabled: true,
+						headerTitle,
+						headerRight,
+						headerTransparent: true,
+						headerBackgroundContainerStyle: {
+							backgroundColor: theme === 'light' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.44)'
+						},
+						...(headerLeft === false ? { headerLeft: null } : {})
+					}}
+				/>
+			</Drawer.Navigator>
 		</AppContext.Provider>
 	);
 }

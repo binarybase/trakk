@@ -11,7 +11,7 @@ const DATE_INTERVAL = 7 * 86400 * 1000;
 const keyExtractor = e => e.id;
 
 export default DeviceEventsScreen = ({ navigation, route }) => {
-	const getPreviousInterval = () => new Date(currentDate.getTime() - DATE_INTERVAL);
+	const getPreviousInterval = useCallback(() => new Date(currentDate.getTime() - DATE_INTERVAL), [ currentDate ]);
 	const [ canLoadMore, setCanLoadMore ] = useState(false);
 	const [ events, setEvents ] = useState([]);
 	const [ error, setError ] = useState(null);
@@ -72,7 +72,7 @@ export default DeviceEventsScreen = ({ navigation, route }) => {
 		} finally {
 			setLoading(false);
 		}
-	}, [ currentDate ]);
+	}, [ getPreviousInterval, previousDate, currentDate ]);
 
 	/**
 	 * fetches event when current date changes
@@ -89,7 +89,7 @@ export default DeviceEventsScreen = ({ navigation, route }) => {
 			// no records available
 			setCanLoadMore(false);
 		})		
-	}, [ currentDate ])
+	}, [ fetchEvents ])
 
 	/**
 	 * fetches events at load
@@ -132,7 +132,7 @@ export default DeviceEventsScreen = ({ navigation, route }) => {
 			)}
 		</>
 	));
-	const eventItemRenderer = (props) => (<ItemComponent {...props} />);
+	const eventItemRenderer = useCallback((props) => (<ItemComponent {...props} />), []);
 
 	// footer
 	const FooterListComponent = useMemo(() => (loading || error) && (
