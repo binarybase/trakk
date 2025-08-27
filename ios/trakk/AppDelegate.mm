@@ -2,6 +2,11 @@
 
 #import <React/RCTBundleURLProvider.h>
 
+extern "C" void __cxa_increment_exception_refcount(void* thrown_exception) {
+// Minimal no-op implementation
+}
+
+
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
