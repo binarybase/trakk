@@ -1,9 +1,9 @@
-import { KeyboardAvoidingView, View, Text, TextInput, TouchableOpacity, useColorScheme, Dimensions } from "react-native";
+import { KeyboardAvoidingView, View, Text, TextInput, TouchableOpacity, Dimensions } from "react-native";
 import { useAuthContext, AUTH_STATUS } from "../lib/context/authContext";
-import { colors, useStyles } from '../style/useStyles';
+import { useStyles } from '../style/useStyles';
 import { isEmpty } from '../lib/util';
 import { useState } from "react";
-import { useHeaderHeight } from "@react-navigation/elements"
+import { useHeaderHeight } from "@react-navigation/elements";
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { faLocationArrow } from "@fortawesome/free-solid-svg-icons/faLocationArrow";
 
@@ -16,65 +16,83 @@ const invalidCredentialsText = "Neplatné přihlašovací údaje.";
 const requestFailedText = "Přihlášení selhalo.";
 const networkErrorText = 'Chyba připojení';
 
-
 export default Login = () => {
 	const screenH = Dimensions.get('screen').height;
 	const h = useHeaderHeight();
-	const [ styles ]= useStyles(s => ({
-		heading: {
-			...s.text.h1,
-			marginBottom: 24
-		},
+	const [styles] = useStyles(s => ({
 		container: {
 			paddingTop: h,
 			backgroundColor: s.bg,
-			padding: 10,
 			flex: 1,
 			height: screenH,
-			flexDirection: 'column'
 		},
-		containerInner: {
+		content: {
+			flex: 1,
 			alignItems: 'center',
-			flexDirection: 'column',
-			//height: screenH,
-			width: '100%',
 			justifyContent: 'center',
-			//alignContent: 'center',
-			flex: 1
+			paddingHorizontal: 32,
 		},
-		touchable: {
-			marginTop: 16
-		}
+		logoIcon: {
+			marginBottom: 8,
+			color: s.colors.blue.primary,
+		},
+		heading: {
+			...s.text.h1,
+			marginBottom: 48,
+			letterSpacing: 1,
+		},
+		errorText: {
+			...s.text.note,
+			color: s.colors.red,
+			marginBottom: 16,
+			textAlign: 'center',
+		},
+		input: {
+			fontSize: 16,
+			color: s.fg,
+			backgroundColor: s.cardBg,
+			borderRadius: 14,
+			padding: 16,
+			marginBottom: 12,
+			width: '100%',
+		},
+		loginBtn: {
+			...s.btn.btn,
+			...s.btn.primary,
+			width: '100%',
+			marginTop: 8,
+		},
+		loginBtnText: {
+			...s.btn.primaryText,
+		},
 	}));
 
-	const [ inputEmail, setInputEmail ] = useState(null);
-	const [ inputPw, setInputPw ] = useState(null);
-	const [ loading, setLoading ] = useState(false);
-	const [ hasError, setHasError ] = useState(false);
-	const [ errorText, setErrorText ] = useState('');
+	const [inputEmail, setInputEmail] = useState(null);
+	const [inputPw, setInputPw] = useState(null);
+	const [loading, setLoading] = useState(false);
+	const [hasError, setHasError] = useState(false);
+	const [errorText, setErrorText] = useState('');
 	const { authStrategy } = useAuthContext();
 
 	const validateForm = () => {
-		if(isEmpty(inputEmail) || isEmpty(inputPw)){
+		if (isEmpty(inputEmail) || isEmpty(inputPw)) {
 			setHasError(true);
 			setErrorText(validationErrorText);
 			return false;
 		}
-
 		return true;
-	}
+	};
 
 	const doLoginProcess = async () => {
 		setHasError(false);
 		setErrorText('');
-		if(!validateForm())
-			return;
+		if (!validateForm()) return;
 
 		setLoading(true);
 		const status = await authStrategy(inputEmail, inputPw);
 		setLoading(false);
 
-		switch(status){
+		switch (status) {
 			case AUTH_STATUS.INVALID_CREDENTIALS:
 				setHasError(true);
 				setErrorText(invalidCredentialsText);
@@ -88,40 +106,51 @@ export default Login = () => {
 				setErrorText(networkErrorText);
 				break;
 		}
-	}
+	};
 
 	return (
-		<KeyboardAvoidingView 
+		<KeyboardAvoidingView
 			contentInsetAdjustmentBehavior="automatic"
 			style={styles.container}
-			contentContainerStyle={styles.containerInner}
 			behavior="padding"
 		>
-			<View style={[styles.content.normal, { alignItems: "center", justifyContent: "center", flex: 1 }]}>
-				<FontAwesomeIcon icon={faLocationArrow} size={32} style={styles.text.h1} />
-				<Text style={[styles.heading, { marginBottom: 55 }]}>Trakk</Text>
-				{hasError === true && (
-					<Text style={styles.text.note}>{errorText}</Text>	
+			<View style={styles.content}>
+				<FontAwesomeIcon icon={faLocationArrow} size={36} style={styles.logoIcon} />
+				<Text style={styles.heading}>Trakk</Text>
+
+				{hasError && (
+					<Text style={styles.errorText}>{errorText}</Text>
 				)}
+
 				<TextInput
-					style={styles.input.large}
+					style={styles.input}
 					placeholder={emailText}
-					autoFocus={true}
-					onChangeText={(v) => setInputEmail(v)}
+					placeholderTextColor={styles.colors.gray.light}
+					autoFocus
+					autoCapitalize="none"
+					keyboardType="email-address"
+					onChangeText={setInputEmail}
 					value={inputEmail}
 				/>
 				<TextInput
-					style={styles.input.large}
+					style={styles.input}
 					placeholder={pwText}
-					secureTextEntry={true}
+					placeholderTextColor={styles.colors.gray.light}
+					secureTextEntry
 					onSubmitEditing={doLoginProcess}
-					onChangeText={(v) => setInputPw(v)}
+					onChangeText={setInputPw}
 					value={inputPw}
 				/>
-				<TouchableOpacity style={[styles.btn.btn, styles.btn.primary, loading ? styles.btn.disabled : null, { width: 150, marginTop: 15 }]} onPress={doLoginProcess} disabled={loading}>
-					<Text style={styles.btn.primaryText}>{loading ? loggingInText : loginText}</Text>
+
+				<TouchableOpacity
+					style={[styles.loginBtn, loading && styles.btn.disabled]}
+					onPress={doLoginProcess}
+					disabled={loading}
+					activeOpacity={0.7}
+				>
+					<Text style={styles.loginBtnText}>{loading ? loggingInText : loginText}</Text>
 				</TouchableOpacity>
 			</View>
 		</KeyboardAvoidingView>
-	)
-}
+	);
+};

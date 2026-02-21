@@ -269,6 +269,8 @@ PODS:
   - React-jsinspector (0.71.11)
   - React-logger (0.71.11):
     - glog
+  - react-native-carplay (2.4.1-beta.0):
+    - React
   - react-native-config (1.5.1):
     - react-native-config/App (= 1.5.1)
   - react-native-config/App (1.5.1):
@@ -442,6 +444,7 @@ DEPENDENCIES:
   - React-jsiexecutor (from `../node_modules/react-native/ReactCommon/jsiexecutor`)
   - React-jsinspector (from `../node_modules/react-native/ReactCommon/jsinspector`)
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
+  - react-native-carplay (from `../node_modules/react-native-carplay`)
   - react-native-config (from `../node_modules/react-native-config`)
   - "react-native-cookies (from `../node_modules/@react-native-cookies/cookies`)"
   - "react-native-geolocation (from `../node_modules/@react-native-community/geolocation`)"
@@ -519,6 +522,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/jsinspector"
   React-logger:
     :path: "../node_modules/react-native/ReactCommon/logger"
+  react-native-carplay:
+    :path: "../node_modules/react-native-carplay"
   react-native-config:
     :path: "../node_modules/react-native-config"
   react-native-cookies:
@@ -601,6 +606,7 @@ SPEC CHECKSUMS:
   React-jsiexecutor: 9625ce2acd947cca7c719d4be84c1a1d2c903c2c
   React-jsinspector: b6ed4cb3ffa27a041cd440300503dc512b761450
   React-logger: f56fb139828fc569c26c8fc004837e86843573c5
+  react-native-carplay: 8f388f6f73e5e0f73ed154ad8794371343ee20c0
   react-native-config: 136f9755ccc991cc6438053a44363259ad4c7813
   react-native-cookies: d648ab7025833b977c0b19e142503034f5f29411
   react-native-geolocation: 9e89c8dbec96c6671da28da6c20f13a0a2a1785f
@@ -630,6 +636,6 @@ SPEC CHECKSUMS:
   RNSVG: 67c430ac7a54043cac37f6bd7bc94f8e22d8a64a
   Yoga: f7decafdc5e8c125e6fa0da38a687e35238420fa
 
-PODFILE CHECKSUM: 6aeb348e23115291fb3a02c08548daa177957a57
+PODFILE CHECKSUM: 29e255a4c484a97e9ad8f83288b589acb6d5ff6e
 
 COCOAPODS: 1.16.2

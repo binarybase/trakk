@@ -2,51 +2,51 @@ import colors from "./colors";
 
 export default (theme) => ({
 	btn: {
-		borderRadius: 12,
-		height: 46,
+		borderRadius: 14,
+		height: 50,
 		alignItems: "center",
 		justifyContent: "center",
 		color: colors.white.one,
 		flexDirection: "row",
 		marginBottom: 16,
-		flexShrink: 0
+		flexShrink: 0,
 	},
 	primary: {
 		backgroundColor: colors.blue.primary,
 	},
 	black: {
-		backgroundColor: theme == 'dark' ? colors.base.dark : colors.base.light,
+		backgroundColor: theme === 'dark' ? colors.base.dark : colors.base.light,
 	},
 	red: {
-		backgroundColor: colors.red
+		backgroundColor: colors.red,
 	},
 	secondary: {
-		backgroundColor: colors.blue.secondary
+		backgroundColor: colors.blue.secondary,
 	},
 	blackText: {
-		color: theme == 'dark' ? colors.base.light : colors.white.one,
+		color: theme === 'dark' ? colors.base.light : colors.white.one,
 	},
 	primaryText: {
-		fontSize: 18,
+		fontSize: 17,
 		fontWeight: '600',
-		color: colors.white.one
+		color: colors.white.one,
 	},
 	secondaryText: {
-		color: colors.blue.primary
+		color: colors.blue.primary,
+		fontWeight: '600',
 	},
 	disabled: {
-		opacity: 0.3
+		opacity: 0.35,
 	},
 	small: {
-		height: 32,
-		paddingRight: 8,
-		paddingLeft: 8,
-		borderRadius: 8
+		height: 34,
+		paddingHorizontal: 12,
+		borderRadius: 10,
 	},
 	smallText: {
-		fontSize: 14
+		fontSize: 14,
 	},
 	noMb: {
-		marginBottom: 0
-	}
+		marginBottom: 0,
+	},
 })

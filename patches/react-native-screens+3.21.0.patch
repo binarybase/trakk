@@ -1,0 +1,23 @@
+diff --git a/node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm b/node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm
+index 79be787..7466e89 100644
+--- a/node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm
++++ b/node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm
+@@ -175,8 +175,16 @@ + (void)enforceDesiredDeviceOrientation
+     }
+     if (newOrientation != UIInterfaceOrientationUnknown) {
+       if (@available(iOS 16.0, *)) {
+-        NSArray *array = [[[UIApplication sharedApplication] connectedScenes] allObjects];
+-        UIWindowScene *scene = (UIWindowScene *)array[0];
++        UIWindowScene *scene = nil;
++        for (UIScene *connectedScene in [UIApplication sharedApplication].connectedScenes) {
++          if ([connectedScene isKindOfClass:[UIWindowScene class]]) {
++            scene = (UIWindowScene *)connectedScene;
++            break;
++          }
++        }
++        if (scene == nil) {
++          return;
++        }
+         UIWindowSceneGeometryPreferencesIOS *geometryPreferences =
+             [[UIWindowSceneGeometryPreferencesIOS alloc] initWithInterfaceOrientations:orientationMask];
+         [scene requestGeometryUpdateWithPreferences:geometryPreferences

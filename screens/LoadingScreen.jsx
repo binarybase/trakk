@@ -1,43 +1,45 @@
-import { ActivityIndicator, SafeAreaView, StyleSheet, View, useColorScheme, Text } from "react-native";
-import colors from "../style/colors";
+import { ActivityIndicator, SafeAreaView, View, Text } from "react-native";
 import { useAuthContext } from "../lib/context/authContext";
 import { useStyles } from "../style/useStyles";
-import { TouchableOpacity } from "react-native-gesture-handler";
 
 export default Loading = () => {
-	const [ styles ]= useStyles(s => ({
+	const [styles] = useStyles(s => ({
 		container: {
-			flex: 1 
+			flex: 1,
+			backgroundColor: s.bg,
 		},
 		view: {
-			justifyContent: "center",
-			alignItems: "center",
-			flex: 1
+			justifyContent: 'center',
+			alignItems: 'center',
+			flex: 1,
 		},
-		loadingText: {
+		statusText: {
 			...s.text.note,
-			marginTop: 10
-		}
-	}))
+			marginTop: 16,
+			fontSize: 15,
+		},
+		errorText: {
+			...s.text.note,
+			marginTop: 16,
+			fontSize: 15,
+			color: s.colors.red,
+		},
+	}));
+
 	const { connected, connectionFailed } = useAuthContext();
 
 	return (
-		<SafeAreaView style={[styles.container, [{
-			backgroundColor: styles.bg
-		}]]}>
+		<SafeAreaView style={styles.container}>
 			<View style={styles.view}>
 				{connectionFailed ? (
-					<View>
-						<Text style={styles.loadingText}>Připojení selhalo</Text>
-						<TouchableOpacity>Zkusit znovu</TouchableOpacity>
-					</View>
+					<Text style={styles.errorText}>Připojení selhalo</Text>
 				) : (
-					<View>
-						<ActivityIndicator size={"large"} />
-						{!connected && <Text style={styles.loadingText}>Připojování...</Text>}
-					</View>
+					<>
+						<ActivityIndicator size="large" />
+						{!connected && <Text style={styles.statusText}>Připojování...</Text>}
+					</>
 				)}
 			</View>
 		</SafeAreaView>
-	)
-}
+	);
+};

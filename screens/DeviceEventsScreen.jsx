@@ -2,57 +2,94 @@ import { useStyles } from '../style/useStyles';
 import { View, Text, FlatList, ActivityIndicator } from 'react-native';
 import { useEffect, useState, useMemo, memo, useCallback, useContext } from 'react';
 import { get } from '../lib/request';
-import { formatDateTime } from '../lib/date';  
+import { formatDateTime } from '../lib/date';
 import { isEmpty } from '../lib/util';
 import deviceInfoContext from '../lib/context/deviceInfoContext';
 
-// 7 days ago
 const DATE_INTERVAL = 7 * 86400 * 1000;
 const keyExtractor = e => e.id;
 
-export default DeviceEventsScreen = ({ navigation, route }) => {
-	const getPreviousInterval = useCallback(() => new Date(currentDate.getTime() - DATE_INTERVAL), [ currentDate ]);
-	const [ canLoadMore, setCanLoadMore ] = useState(false);
-	const [ events, setEvents ] = useState([]);
-	const [ error, setError ] = useState(null);
-	const [ loading, setLoading ] = useState(false);
-	const [ currentDate, setCurrentDate ] = useState(new Date());
+export default DeviceEventsScreen = () => {
+	const [canLoadMore, setCanLoadMore] = useState(false);
+	const [events, setEvents] = useState([]);
+	const [error, setError] = useState(null);
+	const [loading, setLoading] = useState(false);
+	const [currentDate, setCurrentDate] = useState(new Date());
 	const { device } = useContext(deviceInfoContext);
-	const [ styles ] = useStyles(s => ({
+
+	const [styles] = useStyles(s => ({
 		flatList: {
 			flex: 1,
-			padding: 10
 		},
 		empty: {
 			flex: 1,
-			padding: 10
+			paddingVertical: 32,
+			alignItems: 'center',
 		},
-		flatListItem: {
+		eventCard: {
+			marginHorizontal: 16,
+			marginTop: 10,
+			backgroundColor: s.cardBg,
+			borderRadius: 12,
+			overflow: 'hidden',
+		},
+		eventRow: {
 			flexDirection: 'row',
+			alignItems: 'center',
+			paddingHorizontal: 14,
+			paddingVertical: 10,
+		},
+		eventDate: {
+			...s.text.caption,
+			width: 110,
+		},
+		eventType: {
+			...s.text.base,
+			fontWeight: '500',
 			flex: 1,
-			paddingBottom: 3
-		}
+		},
+		attrRow: {
+			flexDirection: 'row',
+			justifyContent: 'space-between',
+			paddingHorizontal: 14,
+			paddingVertical: 6,
+			borderTopWidth: 0.5,
+			borderTopColor: s.separator,
+		},
+		attrKey: {
+			...s.text.caption,
+		},
+		attrValue: {
+			...s.text.caption,
+			fontWeight: '500',
+		},
+		errorText: {
+			...s.text.note,
+			textAlign: 'center',
+			color: s.colors.red,
+		},
+		emptyText: {
+			...s.text.note,
+			textAlign: 'center',
+		},
 	}));
 
-	/**
-	 * fetches events from endpoint
-	 * 
-	 * @returns Array of events
-	 */
+	const getPreviousInterval = useCallback(
+		() => new Date(currentDate.getTime() - DATE_INTERVAL),
+		[currentDate]
+	);
+
 	const fetchEvents = useCallback(async () => {
-		// reset state
 		setError(false);
 		setLoading(true);
 
-		// week ago
 		const previousDate = getPreviousInterval();
 		const params = new URLSearchParams({
 			deviceId: device.id,
 			from: previousDate.toISOString(),
-			to: currentDate.toISOString()
+			to: currentDate.toISOString(),
 		});
 
-		// append most used event types
 		params.append("type", "deviceStopped");
 		params.append("type", "deviceMoving");
 		params.append("type", "alarm");
@@ -61,93 +98,69 @@ export default DeviceEventsScreen = ({ navigation, route }) => {
 		params.append("type", "commandResult");
 
 		try {
-			const events = (await get(`reports/events?${params.toString()}`))?.data || [];
+			const evts = (await get(`reports/events?${params.toString()}`))?.data || [];
 			setLoading(false);
-			// enable load more if we fetched some records
-			events.length && setCanLoadMore(true);
-
-			return events;
-		} catch(ex){
+			if (evts.length) setCanLoadMore(true);
+			return evts;
+		} catch (ex) {
 			setError(true);
 		} finally {
 			setLoading(false);
 		}
-	}, [ getPreviousInterval, previousDate, currentDate ]);
+	}, [getPreviousInterval, currentDate, device]);
 
-	/**
-	 * fetches event when current date changes
-	 * load more
-	 */
 	useEffect(() => {
 		fetchEvents().then(evts => {
-			// append events
-			if(evts && evts.length){
-				setEvents([...events, ...evts.reverse()]);
-				return;
+			if (evts?.length) {
+				setEvents(prev => [...prev, ...evts.reverse()]);
+			} else {
+				setCanLoadMore(false);
 			}
+		});
+	}, [fetchEvents]);
 
-			// no records available
-			setCanLoadMore(false);
-		})		
-	}, [ fetchEvents ])
-
-	/**
-	 * fetches events at load
-	 */
 	useEffect(() => {
 		return () => {
 			setCanLoadMore(false);
 			setCurrentDate(new Date());
 			setEvents([]);
-		}
-	}, [ ]);
+		};
+	}, []);
 
-	/**
-	 * fetches new events when end is reached
-	 */
 	const onEndReached = ({ distanceFromEnd }) => {
-		if(!canLoadMore || distanceFromEnd < 0 || loading || !events.length) return;
-		// move interval 7 days before
+		if (!canLoadMore || distanceFromEnd < 0 || loading || !events.length) return;
 		setCurrentDate(getPreviousInterval());
-	}
+	};
 
 	const ItemComponent = memo(({ item }) => (
-		<>
-			<View style={styles.flatListItem}>
-				<View style={{ width: 100 }}>
-					<Text style={styles.text.base}>{formatDateTime(item.serverTime || item.eventTime)}</Text>
-				</View>
-				<View style={{ width: 140 }}>
-					<Text style={styles.text.base}>{item.type}</Text>
-				</View>
+		<View style={styles.eventCard}>
+			<View style={styles.eventRow}>
+				<Text style={styles.eventDate}>{formatDateTime(item.serverTime || item.eventTime)}</Text>
+				<Text style={styles.eventType}>{item.type}</Text>
 			</View>
 			{Object.keys(item?.attributes || {}).map((k, index) => (
-				<View style={styles.flatListItem} key={index}>
-					<Text style={styles.text.base}>{k}</Text>
-					<Text style={styles.text.base}>{item.attributes[k]}</Text>
+				<View style={styles.attrRow} key={index}>
+					<Text style={styles.attrKey}>{k}</Text>
+					<Text style={styles.attrValue}>{item.attributes[k]}</Text>
 				</View>
 			))}
-			{!isEmpty(item?.attributes) && (
-				<View style={{ height: 2 }}></View>
-			)}
-		</>
+		</View>
 	));
-	const eventItemRenderer = useCallback((props) => (<ItemComponent {...props} />), []);
 
-	// footer
+	const eventItemRenderer = useCallback((props) => <ItemComponent {...props} />, []);
+
 	const FooterListComponent = useMemo(() => (loading || error) && (
 		<View style={styles.empty}>
-			{error && (<Text style={{ textAlign: 'center' }}>Při načítání nastala chyba</Text>)}
-			{loading && (<ActivityIndicator size={"small"} />)}
+			{error && <Text style={styles.errorText}>Při načítání nastala chyba</Text>}
+			{loading && <ActivityIndicator size="small" />}
 		</View>
-	), [ loading ]);
+	), [loading, error]);
 
-	// displayed when list is empty
-	const EmptyListComponent = useMemo(() => (
+	const EmptyListComponent = useMemo(() => !loading && (
 		<View style={styles.empty}>
-			<Text style={styles.text.base}>Nejsou k dispozici žádné záznamy</Text>
+			<Text style={styles.emptyText}>Nejsou k dispozici žádné záznamy</Text>
 		</View>
-	), [ ]);
+	), [loading]);
 
 	return (
 		<FlatList
@@ -160,5 +173,5 @@ export default DeviceEventsScreen = ({ navigation, route }) => {
 			onEndReachedThreshold={0.01}
 			onEndReached={onEndReached}
 		/>
-	)
-}
+	);
+};

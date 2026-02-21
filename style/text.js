@@ -1,35 +1,49 @@
 import colors from "./colors";
 
-export default (theme) => ({
-	base: {
-		color: theme === 'dark' ? colors.base.dark : colors.base.light,
-	},
-	largeTitle: {
-		fontSize: 34,
-		fontWeight: 'bold',
-		color: theme == 'dark' ? colors.base.dark : colors.base.light,
-	},
-	h1: {
-		fontSize: 28,
-		fontWeight: 'bold',
-		color: theme == 'dark' ? colors.base.dark : colors.base.light,
-	},
-	h2: {
-		fontSize: 22,
-		fontWeight: '800',
-		color: theme == 'dark' ? colors.base.dark : colors.base.light,
-	},
-	subtitle: {
-		fontSize: 20,
-		fontWeight: '500',
-		color: theme == 'dark' ? colors.gray.dark : colors.gray.light,
-	},
-	note: {
-		fontSize: 14,
-		color: theme == 'dark' ? colors.gray.dark : colors.gray.light,
-		marginBottom: 16
-	},
-	center: {
-		textAlign: "center"
-	}
-})
+export default (theme) => {
+	const fg = theme === 'dark' ? colors.base.dark : colors.base.light;
+	const muted = theme === 'dark' ? colors.gray.dark : colors.gray.light;
+
+	return {
+		base: {
+			color: fg,
+			fontSize: 15,
+		},
+		largeTitle: {
+			fontSize: 34,
+			fontWeight: '700',
+			letterSpacing: 0.4,
+			color: fg,
+		},
+		h1: {
+			fontSize: 28,
+			fontWeight: '700',
+			letterSpacing: 0.36,
+			color: fg,
+		},
+		h2: {
+			fontSize: 22,
+			fontWeight: '700',
+			letterSpacing: 0.35,
+			color: fg,
+		},
+		subtitle: {
+			fontSize: 17,
+			fontWeight: '600',
+			color: muted,
+		},
+		note: {
+			fontSize: 13,
+			color: muted,
+			marginBottom: 12,
+		},
+		caption: {
+			fontSize: 12,
+			color: muted,
+			letterSpacing: -0.08,
+		},
+		center: {
+			textAlign: 'center',
+		},
+	};
+};

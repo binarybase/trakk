@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
-import { createAuthContext } from './lib/context/authContext';
+import { useMemo, useEffect } from 'react';
+import { AuthContext, useAuthProvider } from './lib/context/authContext';
+import { DevicesContext, useDevicesProvider } from './lib/context/devicesContext';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import LoadingScreen from './screens/LoadingScreen';
@@ -11,17 +12,21 @@ import 'react-native-gesture-handler';
 import { useStyles } from './style/useStyles';
 import { useColorScheme } from 'react-native';
 import TripInfoScreen from './screens/TripInfoScreen';
-import { createDevicesContext } from './lib/context/devicesContext';
+import { initCarPlay } from './lib/carplay';
 
 const Stack = createNativeStackNavigator();
 
 const App = () => {
-	const { AuthContext, ...authContextValue } = createAuthContext();
-	const { connected, loggedIn } = authContextValue;
-	const [ styles ]= useStyles();
+	const authContext = useAuthProvider();
+	const { connected, loggedIn, token } = authContext;
+	const devicesContext = useDevicesProvider(token, loggedIn);
+	const [styles] = useStyles();
 	const theme = useColorScheme();
-	const devicesContext = createDevicesContext();
-	const { DevicesContext } = devicesContext;
+
+	// Initialize CarPlay listeners once
+	useEffect(() => {
+		initCarPlay();
+	}, []);
 
 	const Theme = useMemo(() => ({
 		...DefaultTheme,
@@ -33,39 +38,44 @@ const App = () => {
 			text: styles.fg,
 			border: styles.colors.gray[theme],
 			notification: styles.bg,
-			dark: theme === 'dark'
-		}
-	}), [ theme, styles ]);
+		},
+		dark: theme === 'dark',
+	}), [theme, styles]);
 
 	return (
-		<AuthContext.Provider value={authContextValue}>
+		<AuthContext.Provider value={authContext}>
 			<DevicesContext.Provider value={devicesContext}>
-			<NavigationContainer theme={Theme}>
-				<Stack.Navigator>
-					{
-						// not connected to the server
-						!connected ? (
-							<Stack.Screen name="LoadingScreen" component={LoadingScreen} options={{headerShown: false}} />
-						) :
-						// user not logged in
-						!loggedIn ? (
-							(<Stack.Screen name="Přihlášení" component={LoginScreen} options={{ headerShown: false }} />)
-						) :
-						// authenticated
-						(<>
-							<Stack.Screen name="HomeScreen" component={HomeScreen} options={{
-								headerShown: false
-							}} />
-							<Stack.Screen name="DeviceInfoScreen" component={DeviceInfoScreen} />
-							<Stack.Screen name="DeviceEventsScreen" component={DeviceEventsScreen} />
-							<Stack.Screen name="TripInfoScreen" component={TripInfoScreen} />
-						</>)
-					}
-				</Stack.Navigator>
-			</NavigationContainer>
+				<NavigationContainer theme={Theme}>
+					<Stack.Navigator>
+						{!connected ? (
+							<Stack.Screen
+								name="LoadingScreen"
+								component={LoadingScreen}
+								options={{ headerShown: false }}
+							/>
+						) : !loggedIn ? (
+							<Stack.Screen
+								name="Přihlášení"
+								component={LoginScreen}
+								options={{ headerShown: false }}
+							/>
+						) : (
+							<>
+								<Stack.Screen
+									name="HomeScreen"
+									component={HomeScreen}
+									options={{ headerShown: false }}
+								/>
+								<Stack.Screen name="DeviceInfoScreen" component={DeviceInfoScreen} />
+								<Stack.Screen name="DeviceEventsScreen" component={DeviceEventsScreen} />
+								<Stack.Screen name="TripInfoScreen" component={TripInfoScreen} />
+							</>
+						)}
+					</Stack.Navigator>
+				</NavigationContainer>
 			</DevicesContext.Provider>
 		</AuthContext.Provider>
-	)
-}
+	);
+};
 
 export default App;

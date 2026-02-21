@@ -1,16 +1,18 @@
 export default {
-	base: {light: '#000', dark: '#fff'},
-	container: { dark: "rgba(45,45,45,0.95)", light: "rgba(255,255,255,0.95)" },
-	opacity01: {light: "rgba(0,0,0,0.1)", dark: "rgba(255,255,255,0.1)"},
-	opacity03: {light: "rgba(0,0,0,0.3)", dark: "rgba(255,255,255,0.3)"},
-	opacity06: {light: "rgba(0,0,0,0.6)", dark: "rgba(255,255,255,0.6)"},
-	opacity08: {light: "rgba(0,0,0,0.8)", dark: "rgba(255,255,255,0.8)"},
+	base: { light: '#1c1c1e', dark: '#f5f5f7' },
+	container: { dark: '#1c1c1e', light: '#ffffff' },
+	card: { dark: '#2c2c2e', light: '#f2f2f7' },
+	separator: { dark: 'rgba(255,255,255,0.08)', light: 'rgba(0,0,0,0.06)' },
+	opacity01: { light: 'rgba(0,0,0,0.05)', dark: 'rgba(255,255,255,0.06)' },
+	opacity03: { light: 'rgba(0,0,0,0.12)', dark: 'rgba(255,255,255,0.12)' },
+	opacity06: { light: 'rgba(0,0,0,0.5)', dark: 'rgba(255,255,255,0.5)' },
+	opacity08: { light: 'rgba(0,0,0,0.8)', dark: 'rgba(255,255,255,0.8)' },
 	gray: {
-		light: 'rgba(0,0,0,0.5)',
-		dark: 'rgba(255,255,255,0.5)'
+		light: '#8e8e93',
+		dark: '#98989d'
 	},
 	white: {
-		one: 'white'
+		one: '#ffffff'
 	},
 	pink: {
 		one: '#D298DC',
@@ -20,16 +22,19 @@ export default {
 		five: '#F3EEF8',
 	},
 	blue: {
-		primary: "#0ea5e9",
-		secondary: "rgba(0,170,255,0.2)"
+		primary: '#007aff',
+		secondary: 'rgba(0,122,255,0.12)'
 	},
 	violet: {
-		primary: "#9747FF"
+		primary: '#af52de'
 	},
 	yellow: {
-		primary: "#F9C23C"
+		primary: '#ff9f0a'
 	},
-	red: "rgb(255,59,48)",
+	green: {
+		primary: '#34c759'
+	},
+	red: '#ff3b30',
 	skyBlue: {
 		one: '#B6DBE3'
 	}

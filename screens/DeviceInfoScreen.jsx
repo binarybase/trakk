@@ -8,8 +8,9 @@ import { faInfoCircle, faExclamationTriangle, faTerminal } from '@fortawesome/fr
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DeviceCommandsScreen from './DeviceCommandsScreen';
 
+const TabNavigator = createBottomTabNavigator();
+
 export default DeviceInfoScreen = ({ navigation, route }) => {
-	const TabNavigator = createBottomTabNavigator();
 	const { device } = route.params;	
 	const [ styles ] = useStyles();
 	const IconComponent = useCallback(({ focused, icon }) => (<FontAwesomeIcon icon={icon} size={24} color={focused ? styles.colors.blue.primary : styles.fg}  />), [ styles ]);

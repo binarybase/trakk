@@ -4,38 +4,49 @@ import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { faCircleUp } from "@fortawesome/free-solid-svg-icons";
 
 export default MessageBar = ({ value, onSubmit, setValue }) => {
-	const [ styles ] = useStyles(s => ({
+	const [styles] = useStyles(s => ({
 		view: {
-			flexDirection: "row",
-			alignItems: "center",
-			justifyContent: "center"
+			flexDirection: 'row',
+			alignItems: 'center',
+			paddingHorizontal: 12,
+			paddingVertical: 8,
+			borderTopWidth: 0.5,
+			borderTopColor: s.separator,
+			backgroundColor: s.bg,
 		},
 		textInput: {
-			...s.input.text,
-			borderRadius: 18,
-			backgroundColor: s.bg,
 			flex: 1,
-			paddingLeft: 10,
-			paddingRight: 10
+			backgroundColor: s.cardBg,
+			borderRadius: 20,
+			paddingHorizontal: 16,
+			paddingVertical: 10,
+			fontSize: 15,
+			color: s.fg,
 		},
 		button: {
-			...s.btn.btn,
-			...s.btn.red,
 			marginLeft: 10,
-			paddingLeft: 10,
-			paddingRight: 10
+			width: 40,
+			height: 40,
+			borderRadius: 20,
+			backgroundColor: s.colors.blue.primary,
+			alignItems: 'center',
+			justifyContent: 'center',
 		},
-		icon: {
-			...s.colors.red
-		}
 	}));
-	
+
 	return (
 		<View style={styles.view}>
-			<TextInput value={value} onChangeText={setValue} style={styles.textInput} autoComplete={"off"}  />
-			<TouchableOpacity onPress={onSubmit} style={styles.button}>
-				<FontAwesomeIcon icon={faCircleUp} size={24} style={styles.icon} />
+			<TextInput
+				value={value}
+				onChangeText={setValue}
+				style={styles.textInput}
+				autoComplete="off"
+				placeholder="Příkaz..."
+				placeholderTextColor={styles.colors.gray.light}
+			/>
+			<TouchableOpacity onPress={onSubmit} style={styles.button} activeOpacity={0.7}>
+				<FontAwesomeIcon icon={faCircleUp} size={22} color="#fff" />
 			</TouchableOpacity>
 		</View>
-	)
-}
+	);
+};

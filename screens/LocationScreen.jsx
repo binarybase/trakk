@@ -1,6 +1,6 @@
 import MapView from 'react-native-maps';
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useStyles } from "../style/useStyles";
+import { useCallback, useEffect, useRef, useMemo } from 'react';
+import { useStyles } from '../style/useStyles';
 import { Dimensions, TouchableOpacity } from 'react-native';
 import { useDevicesContext } from '../lib/context/devicesContext';
 import { useAppContext } from '../lib/context/appContext';
@@ -12,146 +12,129 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { debug } from '../lib/logger';
 
 const MODULE = 'LocationScreen';
-const HEADER_TITLE = "Trakk";
-
-let markerIdCache = [];
+const HEADER_TITLE = 'Trakk';
 
 export default () => {
 	const { loggedIn } = useAuthContext();
 	const { setHeaderTitle, setHeaderRight } = useAppContext();
-	const { isTestEnabled, devices, update, currentDevice, setPinnedDevice, pinnedDevice } = useDevicesContext();
-	//const [ lastPosition, setLastPosition ] = useStorage('mapPosition', null);
+	const { devices, currentDevice, setPinnedDevice, pinnedDevice } = useDevicesContext();
 	const mapViewRef = useRef();
+	const markerIdsRef = useRef([]);
 	const { width, height } = Dimensions.get('window');
 	const LATITUDE_DELTA = 0.0922;
-	const LONGITUDE_DELTA = LATITUDE_DELTA * width / height;
-	const [ styles, theme ]= useStyles({
-		map: {
-			flex: 1
-		},
-		rightHeaderButton: {
-			marginRight: 15,
-			padding: 5
-		}
+	const LONGITUDE_DELTA = LATITUDE_DELTA * (width / height);
+	const [styles] = useStyles({
+		map: { flex: 1 },
+		rightHeaderButton: { marginRight: 15, padding: 5 },
 	});
 
-	const RightIconComponent = useCallback(() => (
-		<TouchableOpacity style={styles.rightHeaderButton} onPress={fitToAllMarkers}>
-			<FontAwesomeIcon icon={faStreetView} size={20} color={styles.colors.blue.primary} />
-		</TouchableOpacity>
-	), []);
+	const fitToAllMarkers = useCallback(() => {
+		const ids = markerIdsRef.current;
+		debug(MODULE, 'fitToAllMarkers', ids);
+		if (!ids.length) return;
+		mapViewRef.current?.fitToSuppliedMarkers(ids);
+		setPinnedDevice(null);
+	}, [setPinnedDevice]);
 
-	const setDefaultHeader = () => {
+	const RightIconComponent = useCallback(
+		() => (
+			<TouchableOpacity style={styles.rightHeaderButton} onPress={fitToAllMarkers}>
+				<FontAwesomeIcon icon={faStreetView} size={20} color={styles.colors.blue.primary} />
+			</TouchableOpacity>
+		),
+		[fitToAllMarkers, styles]
+	);
+
+	const setDefaultHeader = useCallback(() => {
 		setHeaderTitle(HEADER_TITLE);
 		setHeaderRight(() => RightIconComponent);
-	}
+	}, [setHeaderTitle, setHeaderRight, RightIconComponent]);
 
-	const fitToAllMarkers = () => {
-		debug(MODULE, 'fitToAllMarkers', markerIdCache);
-		if(!markerIdCache.length)
-			return;
+	// Update header when tab changes
+	useFocusedTabEffect(
+		(isFocused) => {
+			if (isFocused) setDefaultHeader();
+		},
+		[setDefaultHeader]
+	);
 
-		mapViewRef.current?.fitToSuppliedMarkers(markerIdCache);
-		resetPinnedDevice();
-	}
-
-	// update header when tab changes
-	useFocusedTabEffect(isFocused => {
-		isFocused && setDefaultHeader();
-	})
-
-	// set default header on load
+	// Set default header on mount
 	useEffect(() => {
 		setDefaultHeader();
-	}, []);
+	}, [setDefaultHeader]);
 
-	// pan to device when changes
+	// Pan to device when currentDevice changes
 	useEffect(() => {
-		if(!currentDevice || !currentDevice.position) return;
-		//mapViewRef.current?.fitToSuppliedMarkers([ currentDevice?.identifier ])
-		debug(MODULE, 'animateToRegion when device changed');
+		if (!currentDevice?.position) return;
+		debug(MODULE, 'animateToRegion for device change');
 		mapViewRef.current?.animateToRegion({
 			latitude: currentDevice.position.latitude,
 			longitude: currentDevice.position.longitude,
 			latitudeDelta: 0.1,
-			longitudeDelta: 0.1
-		})
-	}, [ currentDevice ]);
+			longitudeDelta: 0.1,
+		});
+	}, [currentDevice]);
 
-	// update pinned device when positions changed
+	// Follow pinned device as positions stream in via WebSocket
 	useEffect(() => {
-		if(pinnedDevice){
-			// find pinned device position to refresh coordinates
-			// actually pinned device contains old position object
-			const position = devices.find(d => d.id === pinnedDevice.id)?.position;
-			if(position){
-				//debug(MODULE, 'updatePositions: pan to', pinnedDevice?.identifier, position.latitude, position.longitude);
-				mapViewRef.current?.animateToRegion({
-					latitude: position.latitude,
-					longitude: position.longitude,
-					latitudeDelta: 0.015,
-					longitudeDelta: 0.015
-				})
-			}
+		if (!pinnedDevice) return;
+		const position = devices.find((d) => d.id === pinnedDevice.id)?.position;
+		if (position) {
+			mapViewRef.current?.animateToRegion({
+				latitude: position.latitude,
+				longitude: position.longitude,
+				latitudeDelta: 0.015,
+				longitudeDelta: 0.015,
+			});
 		}
-	}, [ mapViewRef, devices, pinnedDevice ]);
+	}, [devices, pinnedDevice]);
 
-	// run at startup
+	// Update marker IDs cache whenever devices change
 	useEffect(() => {
-		// do not execute when logged out
-		if(!loggedIn){
-			return;
+		if (!loggedIn) return;
+		const ids = devices.map((d) => d.identifier);
+		markerIdsRef.current = ids;
+	}, [devices, loggedIn]);
+
+	// Fit to all markers once devices first load
+	const hasInitialFitRef = useRef(false);
+	useEffect(() => {
+		if (hasInitialFitRef.current || !devices.length || !loggedIn) return;
+		const ids = devices.map((d) => d.identifier);
+		if (ids.length) {
+			setTimeout(() => mapViewRef.current?.fitToSuppliedMarkers(ids), 300);
+			hasInitialFitRef.current = true;
 		}
-
-		// load positions and fit to them
-		debug(MODULE, 'starting watchDevices');
-
-		// update devices on startup / auth status change
-		update().then(devices => {
-			// error
-			if(!devices){
-				return;
-			}
-
-			const markerIds = devices.map(d => d.identifier);
-			if(!markerIds.length)
-				return;
-
-			mapViewRef.current?.fitToSuppliedMarkers(markerIds);
-			markerIdCache = markerIds;
-		})
-
-		// set watcher
-		const watchId = setInterval(update, 10000);
-
-		// clear watchers on refresh
-		return () => {
-			clearInterval(watchId);
-		}
-	}, [ loggedIn, isTestEnabled ]);
+	}, [devices, loggedIn]);
 
 	const resetPinnedDevice = useCallback(() => {
 		setPinnedDevice(null);
-	}, [ ]);
+	}, [setPinnedDevice]);
+
+	const initialRegion = useMemo(
+		() => ({
+			latitude: 49.5783732,
+			longitude: 14.1036266,
+			latitudeDelta: LATITUDE_DELTA,
+			longitudeDelta: LONGITUDE_DELTA,
+		}),
+		[LATITUDE_DELTA, LONGITUDE_DELTA]
+	);
 
 	return (
 		<MapView
 			ref={mapViewRef}
 			style={styles.map}
-			initialRegion={{
-				//14.1036266&y=49.5783732
-				latitude: 49.5783732,
-				longitude: 14.1036266,
-				latitudeDelta: LATITUDE_DELTA,
-				longitudeDelta: LONGITUDE_DELTA
-			}}
+			initialRegion={initialRegion}
 			showsUserLocation={true}
 			showsMyLocationButton={true}
 			showsTraffic={true}
 			zoomEnabled={true}
 			onPanDrag={resetPinnedDevice}
 		>
-			{devices?.map(device => (<DeviceMarker device={device} key={device.id} />))}
+			{devices?.map((device) => (
+				<DeviceMarker device={device} key={device.id} />
+			))}
 		</MapView>
-	)
-}
+	);
+};

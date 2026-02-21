@@ -3,14 +3,12 @@ import {Dimensions} from "react-native";
 export default () => ({
 	normal: {
 		width: Dimensions.get('window').width,
-		paddingLeft: 40,
-		paddingRight: 40
+		paddingHorizontal: 24,
 	},
 	tight: {
-		paddingLeft: 20,
-		paddingRight: 20
+		paddingHorizontal: 16,
 	},
 	justifyCenter: {
-		justifyContent: "center"
+		justifyContent: "center",
 	}
 })

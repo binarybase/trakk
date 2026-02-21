@@ -3,17 +3,20 @@ import colors from "./colors"
 export default (theme) => ({
 	text: {
 		fontSize: 16,
-		color: theme == 'dark' ? colors.base.dark : colors.base.light,
-		borderColor: theme == 'dark' ? colors.gray.dark : colors.gray.light,
-		borderBottomWidth: 1,
+		color: theme === 'dark' ? colors.base.dark : colors.base.light,
+		backgroundColor: theme === 'dark' ? colors.card.dark : colors.card.light,
+		borderRadius: 12,
 		padding: 16,
-		paddingLeft: 0,
-		marginBottom: 16
+		marginBottom: 12,
 	},
 	large: {
-		fontSize: 28,
-		fontWeight: '600',
-		color: theme == 'dark' ? colors.base.dark : colors.base.light,
-		paddingBottom: 20
+		fontSize: 17,
+		fontWeight: '500',
+		color: theme === 'dark' ? colors.base.dark : colors.base.light,
+		backgroundColor: theme === 'dark' ? colors.card.dark : colors.card.light,
+		borderRadius: 14,
+		padding: 16,
+		marginBottom: 12,
+		width: '100%',
 	}
 })

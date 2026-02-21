@@ -1,0 +1,115 @@
+diff --git a/node_modules/react-native-carplay/ios/RCTConvert+RNCarPlay.m b/node_modules/react-native-carplay/ios/RCTConvert+RNCarPlay.m
+index 5ef378d..d3df850 100644
+--- a/node_modules/react-native-carplay/ios/RCTConvert+RNCarPlay.m
++++ b/node_modules/react-native-carplay/ios/RCTConvert+RNCarPlay.m
+@@ -71,19 +71,64 @@ + (CPRouteChoice*)CPRouteChoice:(id)json {
+     return [[CPRouteChoice alloc] initWithSummaryVariants:[RCTConvert NSStringArray:json[@"additionalInformationVariants"]] additionalInformationVariants:[RCTConvert NSStringArray:json[@"selectionSummaryVariants"]] selectionSummaryVariants:[RCTConvert NSStringArray:json[@"summaryVariants"]]];
+ }
+ 
+++ (NSString *)safeString:(id)value {
++    if (!value || [value isKindOfClass:[NSNull class]]) return @"";
++    return [value isKindOfClass:[NSString class]] ? value : [value description];
++}
++
+ + (CPPointOfInterest*)CPPointOfInterest:(id)json {
+     MKMapItem *location = [RCTConvert MKMapItem:json[@"location"]];
+-    NSString *title = [RCTConvert NSString:json[@"title"]];
+-    NSString *subtitle = [RCTConvert NSString:json[@"subtitle"]];
+-    NSString *summary = [RCTConvert NSString:json[@"summary"]];
+-    NSString *detailTitle = [RCTConvert NSString:json[@"detailTitle"]];
+-    NSString *detailSubtitle = [RCTConvert NSString:json[@"detailSubtitle"]];
+-    NSString *detailSummary = [RCTConvert NSString:json[@"detailSummary"]];
+-
+-    CPPointOfInterest *poi = [[CPPointOfInterest alloc] initWithLocation:location title:title subtitle:subtitle summary:summary detailTitle:detailTitle detailSubtitle:detailSubtitle detailSummary:detailSummary pinImage:nil];
++    NSString *title = [self safeString:json[@"title"]];
++    NSString *subtitle = [self safeString:json[@"subtitle"]];
++    NSString *summary = [self safeString:json[@"summary"]];
++    NSString *detailTitle = [self safeString:json[@"detailTitle"]];
++    NSString *detailSubtitle = [self safeString:json[@"detailSubtitle"]];
++    NSString *detailSummary = [self safeString:json[@"detailSummary"]];
++
++    UIImage *pinImage = nil;
++    id pinImageVal = json[@"pinImage"];
++    id pinLabelVal = json[@"pinLabel"];
++    if (pinImageVal && ![pinImageVal isKindOfClass:[NSNull class]]) {
++        pinImage = [RCTConvert UIImage:pinImageVal];
++    } else if (pinLabelVal && ![pinLabelVal isKindOfClass:[NSNull class]]) {
++        NSString *label = [self safeString:pinLabelVal];
++        if (label.length > 0) {
++            pinImage = [self generatePinImageWithLabel:label];
++        }
++    }
++
++    CPPointOfInterest *poi = [[CPPointOfInterest alloc] initWithLocation:location title:title subtitle:subtitle summary:summary detailTitle:detailTitle detailSubtitle:detailSubtitle detailSummary:detailSummary pinImage:pinImage];
+     return poi;
+ }
+ 
+++ (UIImage *)generatePinImageWithLabel:(NSString *)label {
++    CGFloat size = 18.0;
++    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(size, size)];
++    UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull rendererContext) {
++        UIBezierPath *circle = [UIBezierPath bezierPathWithOvalInRect:CGRectMake(0, 0, size, size)];
++        [[UIColor colorWithRed:0.0 green:0.48 blue:1.0 alpha:1.0] setFill];
++        [circle fill];
++
++        NSMutableParagraphStyle *style = [[NSMutableParagraphStyle alloc] init];
++        style.alignment = NSTextAlignmentCenter;
++        CGFloat fontSize = label.length > 2 ? 7.0 : (label.length > 1 ? 8.0 : 9.0);
++        NSDictionary *attrs = @{
++            NSFontAttributeName: [UIFont boldSystemFontOfSize:fontSize],
++            NSForegroundColorAttributeName: [UIColor whiteColor],
++            NSParagraphStyleAttributeName: style,
++        };
++        CGSize textSize = [label sizeWithAttributes:attrs];
++        CGRect textRect = CGRectMake(
++            (size - textSize.width) / 2.0,
++            (size - textSize.height) / 2.0,
++            textSize.width,
++            textSize.height
++        );
++        [label drawInRect:textRect withAttributes:attrs];
++    }];
++    return image;
++}
++
+ + (CPAlertActionStyle)CPAlertActionStyle:(NSString*) json {
+     if ([json isEqualToString:@"cancel"]) {
+         return CPAlertActionStyleCancel;
+diff --git a/node_modules/react-native-carplay/ios/RNCarPlay.m b/node_modules/react-native-carplay/ios/RNCarPlay.m
+index 153dbad..33019bc 100644
+--- a/node_modules/react-native-carplay/ios/RNCarPlay.m
++++ b/node_modules/react-native-carplay/ios/RNCarPlay.m
+@@ -385,7 +385,8 @@ - (void)updateListRowItemImageWithURL:(CPListImageRowItem *)item imgUrl:(NSStrin
+     } else if ([type isEqualToString:@"poi"]) {
+         NSString *title = [RCTConvert NSString:config[@"title"]];
+         NSMutableArray<__kindof CPPointOfInterest *> * items = [NSMutableArray new];
+-        NSUInteger selectedIndex = 0;
++        NSUInteger selectedIndex = config[@"selectedIndex"] ? [RCTConvert NSUInteger:config[@"selectedIndex"]] : NSNotFound;
++        NSLog(@"[trakk] POI template selectedIndex=%lu items=%lu", (unsigned long)selectedIndex, (unsigned long)[items count]);
+ 
+         NSArray<NSDictionary*> *_items = [RCTConvert NSDictionaryArray:config[@"items"]];
+         for (NSDictionary *_item in _items) {
+diff --git a/node_modules/react-native-carplay/lib/templates/PointOfInterestTemplate.js b/node_modules/react-native-carplay/lib/templates/PointOfInterestTemplate.js
+index 50b4d5b..b469e7b 100644
+--- a/node_modules/react-native-carplay/lib/templates/PointOfInterestTemplate.js
++++ b/node_modules/react-native-carplay/lib/templates/PointOfInterestTemplate.js
+@@ -9,7 +9,6 @@ class PointOfInterestTemplate extends Template_1.Template {
+     get eventMap() {
+         return {
+             didSelectPointOfInterest: 'onPointOfInterestSelect',
+-            didChangeMapRegion: 'onChangeMapRegion',
+         };
+     }
+ }
+diff --git a/node_modules/react-native-carplay/src/templates/PointOfInterestTemplate.ts b/node_modules/react-native-carplay/src/templates/PointOfInterestTemplate.ts
+index f53ea3b..8b7511a 100644
+--- a/node_modules/react-native-carplay/src/templates/PointOfInterestTemplate.ts
++++ b/node_modules/react-native-carplay/src/templates/PointOfInterestTemplate.ts
+@@ -34,7 +34,6 @@ export class PointOfInterestTemplate extends Template<PointOfInterestTemplateCon
+   get eventMap() {
+     return {
+       didSelectPointOfInterest: 'onPointOfInterestSelect',
+-      didChangeMapRegion: 'onChangeMapRegion',
+     };
+   }
+ }
