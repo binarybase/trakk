@@ -30,9 +30,10 @@ export const useStyles = (styles = {}) => {
 	}), [ theme ]);
 
 	const sheet = useMemo(
+		// component styles win over base groups of the same name (e.g. a local `list`)
 		() => StyleSheet.create({
-			...(isFunction(styles) ? styles(baseStyles) : styles),
-			...baseStyles
+			...baseStyles,
+			...(isFunction(styles) ? styles(baseStyles) : styles)
 		}),
 		// callers pass inline style factories; the sheet only depends on the theme
 		// eslint-disable-next-line react-hooks/exhaustive-deps

@@ -14,6 +14,7 @@ import { faSquareParking } from '@fortawesome/free-solid-svg-icons/faSquareParki
 import { faGear } from '@fortawesome/free-solid-svg-icons/faGear';
 
 import { useMemo } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { useStyles } from '../style/useStyles';
 
 const Tab = createBottomTabNavigator();
@@ -33,6 +34,8 @@ const SETTINGS_OPTIONS = { title: 'Nastavení', headerLeft: () => null, tabBarIc
 
 const DRAWER_OPTIONS = { headerShown: false, swipeEnabled: true };
 const DRAWER_RADIUS = 28;
+// phone-like width on tablets; phones stay at 86% (≤ ~370pt)
+const DRAWER_MAX_WIDTH = 380;
 
 /**
  * each tab owns its header; report tabs add the vehicle name and their buttons
@@ -63,17 +66,18 @@ const TabNavigator = () => {
 
 export default function HomeScreen() {
 	const [styles] = useStyles();
+	const { width } = useWindowDimensions();
 	const screenOptions = useMemo(() => ({
 		drawerType: 'front',
 		overlayColor: 'rgba(0,0,0,0.3)',
 		drawerStyle: {
-			width: '86%',
+			width: Math.min(width * 0.86, DRAWER_MAX_WIDTH),
 			backgroundColor: styles.isDark ? styles.bg : styles.cardBg,
 			borderTopRightRadius: DRAWER_RADIUS,
 			borderBottomRightRadius: DRAWER_RADIUS,
 			overflow: 'hidden',
 		},
-	}), [styles]);
+	}), [styles, width]);
 
 	return (
 		<Drawer.Navigator drawerContent={renderDrawerContent} screenOptions={screenOptions}>
