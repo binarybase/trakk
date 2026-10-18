@@ -1,63 +1,95 @@
-import { StyleSheet, Text } from 'react-native';
-import { COLOR_DRIVING, COLOR_STANDING } from '../../lib/constants';
-import { titleFormatter } from '../../lib/formatter';
+import { StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { Marker } from 'react-native-maps';
-import LocationArrow from '../../assets/location_arrow.js';
-import { useDevicesContext } from '../../lib/context/devicesContext';
+import VehiclePuck from './VehiclePuck';
+import { DEVICE_STATE, deviceState, STATE_COLORS } from '../../lib/deviceStatus';
+import { formatSpeed } from '../../lib/formatter';
 
-export default DeviceMarker = ({ device }) => {
-	const { setCurrentDevice } = useDevicesContext();
-	const ICON_FG = device.moving ? COLOR_DRIVING : COLOR_STANDING;
-	const TEXT_BG = device.moving ? styles.colorDriving : styles.colorStanding;
-	const ROTATION = parseInt(device.position?.course || 0);
+const HALO_SIZE = 46;
+const LABEL_GAP = 3;
+const LABEL_HEIGHT = 20;
+// MapKit centers the view on the coordinate; shift it so the puck sits there instead of the puck and label
+const CENTER_OFFSET = { x: 0, y: (LABEL_GAP + LABEL_HEIGHT) / 2 };
 
-	const onPress = () => {
-		setCurrentDevice(device);
-	};
+/**
+ * Vehicle marker: a puck colored by state with a heading arrow while moving,
+ * "P" while parked, and a name capsule below.
+ *
+ * @param {Object} props.device - device with position
+ * @param {Boolean} [props.selected] - emphasized with a halo
+ * @param {Function} [props.onPress] - called with the device
+ */
+export default function DeviceMarker({ device, selected = false, onPress }) {
+	const dark = useColorScheme() === 'dark';
+	const state = deviceState(device);
+	const color = STATE_COLORS[state];
+	const moving = state === DEVICE_STATE.MOVING;
 
 	return (
 		<Marker
 			identifier={device.identifier}
-			key={device.id}
 			coordinate={{
 				latitude: device.position.latitude,
 				longitude: device.position.longitude,
 			}}
-			onCalloutPress={onPress}
+			onPress={onPress && (() => onPress(device))}
+			centerOffset={CENTER_OFFSET}
+			zIndex={selected ? 3 : moving ? 2 : 1}
 			tracksViewChanges={false}
-			flat
 		>
-			<LocationArrow style={[styles.markerIcon, { fill: ICON_FG, transform: [{ rotate: ROTATION + 'deg' }] }]} />
-			<Text numberOfLines={1} style={[styles.markerLabel, TEXT_BG, styles.markerText]}>
-				{titleFormatter(device)}
-			</Text>
+			<View style={styles.container}>
+				<View style={[styles.halo, selected && styles.haloSelected]}>
+					<VehiclePuck device={device} elevated />
+				</View>
+				<View style={[styles.label, dark && styles.labelDark]}>
+					<Text numberOfLines={1} style={[styles.labelText, dark && styles.labelTextDark]}>
+						{device.name}
+						{moving && <Text style={[styles.speedText, { color }]}>{`  ${formatSpeed(device.position.speed)}`}</Text>}
+					</Text>
+				</View>
+			</View>
 		</Marker>
 	);
-};
+}
 
 const styles = StyleSheet.create({
-	markerIcon: {
-		stroke: 'black',
-		position: 'absolute',
+	container: {
+		alignItems: 'center',
 	},
-	markerLabel: {
-		overflow: 'hidden',
-		position: 'absolute',
-		top: 30,
-		left: 15,
-		paddingHorizontal: 6,
-		paddingVertical: 3,
-		borderRadius: 6,
+	halo: {
+		width: HALO_SIZE,
+		height: HALO_SIZE,
+		borderRadius: HALO_SIZE / 2,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	haloSelected: {
+		backgroundColor: 'rgba(0,122,255,0.28)',
+	},
+	label: {
+		marginTop: LABEL_GAP,
+		height: LABEL_HEIGHT,
+		maxWidth: 160,
+		paddingHorizontal: 8,
+		borderRadius: LABEL_HEIGHT / 2,
+		justifyContent: 'center',
+		backgroundColor: 'rgba(255,255,255,0.95)',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.18,
+		shadowRadius: 2,
+	},
+	labelDark: {
+		backgroundColor: 'rgba(38,38,40,0.95)',
+	},
+	labelText: {
 		fontSize: 11,
 		fontWeight: '600',
+		color: '#1c1c1e',
 	},
-	markerText: {
-		color: '#fff',
+	labelTextDark: {
+		color: '#f5f5f7',
 	},
-	colorDriving: {
-		backgroundColor: COLOR_DRIVING,
-	},
-	colorStanding: {
-		backgroundColor: COLOR_STANDING,
+	speedText: {
+		fontWeight: '700',
 	},
 });

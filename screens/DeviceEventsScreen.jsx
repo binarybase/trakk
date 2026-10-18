@@ -1,21 +1,42 @@
 import { useStyles } from '../style/useStyles';
-import { View, Text, FlatList, ActivityIndicator } from 'react-native';
-import { useEffect, useState, useMemo, memo, useCallback, useContext } from 'react';
+import { View, Text, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { useEffect, useState, useMemo, memo, useCallback, useRef } from 'react';
 import { get } from '../lib/request';
 import { formatDateTime } from '../lib/date';
-import { isEmpty } from '../lib/util';
-import deviceInfoContext from '../lib/context/deviceInfoContext';
+import { eventLabel } from '../lib/eventTypes';
+import { useDeviceInfo } from '../lib/context/deviceInfoContext';
 
-const DATE_INTERVAL = 7 * 86400 * 1000;
-const keyExtractor = e => e.id;
+const PAGE_MS = 7 * 86400 * 1000;
+// stop looking further back after this many weeks without events
+const MAX_EMPTY_PAGES = 4;
+const EVENT_TYPES = ['deviceStopped', 'deviceMoving', 'alarm', 'ignitionOn', 'ignitionOff', 'commandResult'];
+const keyExtractor = e => String(e.id);
 
-export default DeviceEventsScreen = () => {
-	const [canLoadMore, setCanLoadMore] = useState(false);
+const EventItem = memo(({ item, styles }) => (
+	<View style={styles.eventCard}>
+		<View style={styles.eventRow}>
+			<Text style={styles.eventType}>{eventLabel(item.type)}</Text>
+			<Text style={styles.eventDate}>{formatDateTime(item.eventTime || item.serverTime)}</Text>
+		</View>
+		{Object.entries(item.attributes || {}).map(([key, value]) => (
+			<View style={styles.attrRow} key={key}>
+				<Text style={styles.attrKey}>{key}</Text>
+				<Text style={styles.attrValue}>{String(value)}</Text>
+			</View>
+		))}
+	</View>
+));
+
+export default function DeviceEventsScreen() {
+	const { id: deviceId } = useDeviceInfo();
 	const [events, setEvents] = useState([]);
-	const [error, setError] = useState(null);
+	// end of the page being loaded, pages go back in time
+	const [until, setUntil] = useState(() => new Date());
 	const [loading, setLoading] = useState(false);
-	const [currentDate, setCurrentDate] = useState(new Date());
-	const { device } = useContext(deviceInfoContext);
+	const [error, setError] = useState(false);
+	const [canLoadMore, setCanLoadMore] = useState(true);
+	const [retryToken, setRetryToken] = useState(0);
+	const emptyPagesRef = useRef(0);
 
 	const [styles] = useStyles(s => ({
 		flatList: {
@@ -36,17 +57,18 @@ export default DeviceEventsScreen = () => {
 		eventRow: {
 			flexDirection: 'row',
 			alignItems: 'center',
+			justifyContent: 'space-between',
 			paddingHorizontal: 14,
 			paddingVertical: 10,
 		},
 		eventDate: {
 			...s.text.caption,
-			width: 110,
 		},
 		eventType: {
 			...s.text.base,
-			fontWeight: '500',
+			fontWeight: '600',
 			flex: 1,
+			marginRight: 8,
 		},
 		attrRow: {
 			flexDirection: 'row',
@@ -72,106 +94,93 @@ export default DeviceEventsScreen = () => {
 			...s.text.note,
 			textAlign: 'center',
 		},
+		linkText: {
+			...s.text.base,
+			color: s.colors.blue.primary,
+			fontWeight: '500',
+		},
 	}));
 
-	const getPreviousInterval = useCallback(
-		() => new Date(currentDate.getTime() - DATE_INTERVAL),
-		[currentDate]
-	);
-
-	const fetchEvents = useCallback(async () => {
-		setError(false);
-		setLoading(true);
-
-		const previousDate = getPreviousInterval();
+	useEffect(() => {
+		let cancelled = false;
+		const from = new Date(+until - PAGE_MS);
 		const params = new URLSearchParams({
-			deviceId: device.id,
-			from: previousDate.toISOString(),
-			to: currentDate.toISOString(),
+			deviceId,
+			from: from.toISOString(),
+			to: until.toISOString(),
 		});
+		EVENT_TYPES.forEach((type) => params.append('type', type));
 
-		params.append("type", "deviceStopped");
-		params.append("type", "deviceMoving");
-		params.append("type", "alarm");
-		params.append("type", "ignitionOn");
-		params.append("type", "ignitionOff");
-		params.append("type", "commandResult");
+		setLoading(true);
+		setError(false);
+		get(`reports/events?${params.toString()}`)
+			.then((response) => {
+				if (cancelled) return;
+				if (response.status !== 200) {
+					setError(true);
+					return;
+				}
 
-		try {
-			const evts = (await get(`reports/events?${params.toString()}`))?.data || [];
-			setLoading(false);
-			if (evts.length) setCanLoadMore(true);
-			return evts;
-		} catch (ex) {
-			setError(true);
-		} finally {
-			setLoading(false);
-		}
-	}, [getPreviousInterval, currentDate, device]);
+				const page = (response.data || []).reverse();
+				setEvents((prev) => {
+					const known = new Set(prev.map(keyExtractor));
+					return [...prev, ...page.filter((e) => !known.has(keyExtractor(e)))];
+				});
 
-	useEffect(() => {
-		fetchEvents().then(evts => {
-			if (evts?.length) {
-				setEvents(prev => [...prev, ...evts.reverse()]);
-			} else {
-				setCanLoadMore(false);
-			}
-		});
-	}, [fetchEvents]);
+				// quiet weeks don't grow the list, so scrolling can't ask for more: look further back
+				emptyPagesRef.current = page.length ? 0 : emptyPagesRef.current + 1;
+				if (!page.length) {
+					if (emptyPagesRef.current < MAX_EMPTY_PAGES) {
+						setUntil(from);
+					} else {
+						setCanLoadMore(false);
+					}
+				}
+			})
+			.finally(() => !cancelled && setLoading(false));
 
-	useEffect(() => {
 		return () => {
-			setCanLoadMore(false);
-			setCurrentDate(new Date());
-			setEvents([]);
+			cancelled = true;
 		};
-	}, []);
+	}, [deviceId, until, retryToken]);
 
-	const onEndReached = ({ distanceFromEnd }) => {
-		if (!canLoadMore || distanceFromEnd < 0 || loading || !events.length) return;
-		setCurrentDate(getPreviousInterval());
-	};
+	const onEndReached = useCallback(() => {
+		if (!canLoadMore || loading || error || !events.length) return;
+		setUntil((current) => new Date(+current - PAGE_MS));
+	}, [canLoadMore, loading, error, events.length]);
 
-	const ItemComponent = memo(({ item }) => (
-		<View style={styles.eventCard}>
-			<View style={styles.eventRow}>
-				<Text style={styles.eventDate}>{formatDateTime(item.serverTime || item.eventTime)}</Text>
-				<Text style={styles.eventType}>{item.type}</Text>
-			</View>
-			{Object.keys(item?.attributes || {}).map((k, index) => (
-				<View style={styles.attrRow} key={index}>
-					<Text style={styles.attrKey}>{k}</Text>
-					<Text style={styles.attrValue}>{item.attributes[k]}</Text>
-				</View>
-			))}
-		</View>
-	));
+	const retry = useCallback(() => setRetryToken((n) => n + 1), []);
 
-	const eventItemRenderer = useCallback((props) => <ItemComponent {...props} />, []);
+	const renderItem = useCallback(({ item }) => <EventItem item={item} styles={styles} />, [styles]);
 
-	const FooterListComponent = useMemo(() => (loading || error) && (
+	const ListFooterComponent = useMemo(() => (loading || error) && (
 		<View style={styles.empty}>
-			{error && <Text style={styles.errorText}>Při načítání nastala chyba</Text>}
+			{error && (
+				<TouchableOpacity onPress={retry} accessibilityRole="button">
+					<Text style={styles.errorText}>Při načítání nastala chyba</Text>
+					<Text style={styles.linkText}>Zkusit znovu</Text>
+				</TouchableOpacity>
+			)}
 			{loading && <ActivityIndicator size="small" />}
 		</View>
-	), [loading, error]);
+	), [styles, loading, error, retry]);
 
-	const EmptyListComponent = useMemo(() => !loading && (
+	const ListEmptyComponent = useMemo(() => !loading && !error && (
 		<View style={styles.empty}>
 			<Text style={styles.emptyText}>Nejsou k dispozici žádné záznamy</Text>
 		</View>
-	), [loading]);
+	), [styles, loading, error]);
 
 	return (
 		<FlatList
 			style={styles.flatList}
 			data={events}
 			keyExtractor={keyExtractor}
-			renderItem={eventItemRenderer}
-			ListEmptyComponent={EmptyListComponent}
-			ListFooterComponent={FooterListComponent}
-			onEndReachedThreshold={0.01}
+			renderItem={renderItem}
+			ListEmptyComponent={ListEmptyComponent}
+			ListFooterComponent={ListFooterComponent}
+			onEndReachedThreshold={0.2}
 			onEndReached={onEndReached}
 		/>
 	);
-};
+}

@@ -1,39 +1,59 @@
 import MapView, { Polyline, Marker } from 'react-native-maps';
-import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useNavigation } from '@react-navigation/native';
 import { colors, useStyles } from "../../style/useStyles";
 import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
-import { isDeviceMoving, useDevicesContext } from '../../lib/context/devicesContext';
+import { useDevicesContext } from '../../lib/context/devicesContext';
 import { download, EXCEL_TYPE, get } from '../../lib/request';
-import { formatDate } from '../../lib/date';
-import { useAppContext } from '../../lib/context/appContext';
+import { formatDate, formatMonth } from '../../lib/date';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { getRegionForCoordinates } from '../../lib/maputil';
-import LoadingView from './LoadingView';
 import DeviceMarker from './DeviceMarker';
+import { HeaderButton, HeaderButtons } from './HeaderButton';
 import { faCalendar } from '@fortawesome/free-regular-svg-icons/faCalendar';
+import { faFileArrowDown } from '@fortawesome/free-solid-svg-icons/faFileArrowDown';
 import MonthPicker, { ACTION_DATE_SET } from 'react-native-month-year-picker';
-import { useFocusedTabEffect } from '../../lib/hooks/useFocusedTab';
 import Share from 'react-native-share';
 import { alert } from '../../lib/alert';
-import { faFileArrowDown } from '@fortawesome/free-solid-svg-icons/faFileArrowDown';
-import { debug } from '../../lib/logger';
+import { debug, error as logError } from '../../lib/logger';
 import { useReportData } from '../../lib/hooks/useReportData';
 
 const MODULE = 'ReportView';
 const keyExtractor = t => t?.startTime;
+const DEVICE_DELTA = 0.01;
+const POINT_DELTA = 0.05;
 
-export default ReportView = ({
+export const START_COLOR = colors.red;
+export const END_COLOR = colors.violet.primary;
+
+const regionAround = (position, delta) => position?.latitude != null ? {
+	latitude: position.latitude,
+	longitude: position.longitude,
+	latitudeDelta: delta,
+	longitudeDelta: delta,
+} : undefined;
+
+/**
+ * map with a month of report items of the current device
+ *
+ * @param {Function} props.renderItem - ({ item, styles, selection, setSelection, selectionPoint, panToPointMarker }) => element
+ */
+export default function ReportView({
 	downloadReportType,
 	reportType = "trips",
 	reportTitle = "Trasy",
-	reportItemRenderer,
+	renderItem,
 	reportKeyExtractor = keyExtractor
-}) => {
-	const { setHeaderTitle, setHeaderRight } = useAppContext();
+}) {
+	const navigation = useNavigation();
 	const { devices, currentDevice, setCurrentDevice } = useDevicesContext();
+	const deviceId = currentDevice?.id;
+	const deviceName = currentDevice?.name;
 	const mapViewRef = useRef();
+	const positionRef = useRef();
+	positionRef.current = currentDevice?.position;
 
-	const [styles, theme] = useStyles(s => ({
+	const [styles] = useStyles(s => ({
 		container: {
 			flex: 1,
 			backgroundColor: s.bg,
@@ -57,6 +77,20 @@ export default ReportView = ({
 			alignItems: 'center',
 			justifyContent: 'center',
 		},
+		emptyText: {
+			...s.text.note,
+			textAlign: 'center',
+		},
+		errorText: {
+			...s.text.note,
+			textAlign: 'center',
+			color: s.colors.red,
+		},
+		linkText: {
+			...s.text.base,
+			color: s.colors.blue.primary,
+			fontWeight: '500',
+		},
 		loading: {
 			position: 'absolute',
 			top: 0,
@@ -66,31 +100,72 @@ export default ReportView = ({
 			height: '100%',
 			justifyContent: 'center',
 			alignItems: 'center',
-			borderBottomLeftRadius: 16,
-			borderBottomRightRadius: 16,
 		},
-		rightHeaderButton: {
-			marginRight: 8,
-			padding: 8,
+		monthBar: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			paddingHorizontal: 16,
+			paddingTop: 14,
+			paddingBottom: 8,
 		},
+		monthText: {
+			...s.text.subtitle,
+			color: s.fg,
+			marginLeft: 8,
+		},
+		// list rows, shared by the report screens
 		listItem: {
 			flexDirection: 'row',
 			borderBottomColor: s.separator,
 			borderBottomWidth: 0.5,
-			paddingVertical: 10,
-			paddingHorizontal: 12,
+			paddingVertical: 12,
+			paddingHorizontal: 16,
 		},
 		listItemSelected: {
 			backgroundColor: s.colors.blue.secondary,
 		},
-		refreshText: {
-			...s.text.base,
-			alignSelf: 'center',
+		rowMain: {
+			flex: 1,
+			marginRight: 12,
 		},
-		loadMoreLinkText: {
-			...s.text.base,
-			alignSelf: 'center',
-			color: s.colors.blue.primary,
+		rowAside: {
+			alignItems: 'flex-end',
+		},
+		rowTitle: {
+			fontSize: 15,
+			fontWeight: '600',
+			color: s.fg,
+			marginBottom: 4,
+		},
+		rowValue: {
+			fontSize: 15,
+			fontWeight: '600',
+			color: s.fg,
+			marginBottom: 4,
+		},
+		rowMeta: {
+			fontSize: 13,
+			color: s.muted,
+		},
+		addressRow: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			marginTop: 3,
+		},
+		dot: {
+			width: 8,
+			height: 8,
+			borderRadius: 4,
+			marginRight: 8,
+		},
+		addressText: {
+			fontSize: 13,
+			color: s.muted,
+			flex: 1,
+		},
+		rowButton: {
+			marginTop: 8,
+			padding: 2,
 		},
 		overlay: {
 			flex: 1,
@@ -133,11 +208,10 @@ export default ReportView = ({
 		currentDate,
 		onRefresh,
 		onEndReached,
-		loadInitial,
 		setMonth,
-		reset,
+		reload,
 	} = useReportData({
-		currentDevice,
+		deviceId,
 		reportType,
 		keyExtractorFn: reportKeyExtractor,
 	});
@@ -149,19 +223,38 @@ export default ReportView = ({
 	const [loadingCoords, setLoadingCoords] = useState(false);
 	const [displayPicker, setDisplayPicker] = useState(false);
 	const [downloading, setDownloading] = useState(false);
+	const [initialRegion] = useState(() => regionAround(positionRef.current, DEVICE_DELTA));
 
-	const currentDevicePosition = useMemo(
-		() => devices?.find(d => d.id === currentDevice?.id)?.position || currentDevice?.position || {},
-		[currentDevice, devices]
-	);
+	// reports need a device, default to the first one
+	useEffect(() => {
+		if (!currentDevice && devices.length) {
+			setCurrentDevice(devices[0]);
+		}
+	}, [currentDevice, devices, setCurrentDevice]);
+
+	// a different device or month invalidates the selection
+	useEffect(() => {
+		setSelection(undefined);
+		setSelectionPoint(undefined);
+		setSelectionCoords([]);
+	}, [deviceId, currentDate]);
+
+	// center on the newly selected device
+	useEffect(() => {
+		if (!deviceId) return;
+		debug(MODULE, 'device changed', deviceId);
+		const region = regionAround(positionRef.current, DEVICE_DELTA);
+		region && mapViewRef.current?.animateToRegion(region);
+	}, [deviceId]);
 
 	/**
 	 * Downloads Excel report and opens share dialog.
 	 */
 	const downloadReport = useCallback(async () => {
-		const reportFile = `${reportTitle}_${currentDevice.name}`;
+		if (!deviceId) return;
+
 		const params = new URLSearchParams({
-			deviceId: currentDevice.id,
+			deviceId,
 			from: currentDate.firstDayOfMonth.toISOString(),
 			to: currentDate.lastDayOfMonth.toISOString(),
 		});
@@ -170,7 +263,7 @@ export default ReportView = ({
 		try {
 			const response = await download(
 				`reports/${downloadReportType || reportType}?${params.toString()}`,
-				reportFile
+				`${reportTitle}_${deviceName}`
 			);
 			if (!response?.path) {
 				alert('Stažení selhalo - soubor neobsahuje žádná data');
@@ -178,23 +271,36 @@ export default ReportView = ({
 			}
 
 			const { path, unlink } = response;
-			const options = {
-				type: EXCEL_TYPE,
-				message: `${reportType} - ${currentDevice.name}`,
-				url: path,
-				failOnCancel: false,
-			};
-
+			// give the progress modal time to close before the share sheet opens
 			setTimeout(() => {
-				Share.open(options).then(unlink);
+				Share.open({
+					type: EXCEL_TYPE,
+					message: `${reportTitle} - ${deviceName}`,
+					url: path,
+					failOnCancel: false,
+				}).then(unlink);
 			}, 500);
 		} catch (ex) {
-			console.error('downloadReport failed', ex);
+			logError(MODULE, 'downloadReport failed', ex);
 			alert('Stažení selhalo');
 		} finally {
 			setDownloading(false);
 		}
-	}, [currentDevice, currentDate, reportType, downloadReportType, reportTitle]);
+	}, [deviceId, deviceName, currentDate, reportType, downloadReportType, reportTitle]);
+
+	const showPicker = useCallback(() => setDisplayPicker(true), []);
+
+	useLayoutEffect(() => {
+		navigation.setOptions({
+			title: deviceName ? `${reportTitle} – ${deviceName}` : reportTitle,
+			headerRight: () => (
+				<HeaderButtons>
+					<HeaderButton icon={faCalendar} onPress={showPicker} accessibilityLabel="Vybrat měsíc" />
+					<HeaderButton icon={faFileArrowDown} onPress={downloadReport} accessibilityLabel="Exportovat do Excelu" />
+				</HeaderButtons>
+			),
+		});
+	}, [navigation, reportTitle, deviceName, showPicker, downloadReport]);
 
 	/**
 	 * Pan map to a point marker coordinate.
@@ -202,11 +308,7 @@ export default ReportView = ({
 	const panToPointMarker = useCallback((coords) => {
 		if (!coords) return;
 		setSelectionPoint(coords);
-		mapViewRef.current?.animateToRegion({
-			...coords,
-			latitudeDelta: 0.05,
-			longitudeDelta: 0.05,
-		});
+		mapViewRef.current?.animateToRegion(regionAround(coords, POINT_DELTA));
 	}, []);
 
 	/**
@@ -218,111 +320,90 @@ export default ReportView = ({
 		setMonth(date);
 	}, [setMonth]);
 
-	// --- Device change: reset selections and load data ---
-	useEffect(() => {
-		setSelectionPoint({});
-		setSelectionCoords([]);
-
-		if (currentDevice === undefined && devices.length) {
-			setCurrentDevice(devices[0]);
-			return;
-		}
-
-		if (!currentDevice || !currentDate) return;
-		debug(MODULE, 'Device changed:', currentDevice.id);
-
-		loadInitial();
-
-		if (currentDevice && currentDevicePosition?.latitude) {
-			mapViewRef.current?.animateToRegion({
-				latitude: currentDevicePosition.latitude,
-				longitude: currentDevicePosition.longitude,
-				latitudeDelta: 0.01,
-				longitudeDelta: 0.01,
-			});
-		}
-
-		return () => reset();
-	}, [currentDevice, currentDate]);
-
-	// --- Header updates on tab focus ---
-	useFocusedTabEffect(isFocused => {
-		if (!isFocused) return;
-		setHeaderTitle(`${reportTitle} - ${currentDevice?.name}`);
-		setHeaderRight(() => () => <RightIconComponent />);
-	}, [currentDevice, currentDevicePosition]);
-
 	// --- Load route polyline when selection changes ---
 	useEffect(() => {
-		if (!selection?.startTime || !selection?.endTime) return;
+		if (!selection?.startTime || !selection?.endTime || !deviceId) return;
 
-		setLoadingCoords(true);
-		const from = new Date(selection.startTime)?.toISOString();
-		const to = new Date(selection.endTime)?.toISOString();
-		if (!from || !to) return;
-
+		let cancelled = false;
 		const params = new URLSearchParams({
-			deviceId: currentDevice.id,
-			from,
-			to,
+			deviceId,
+			from: new Date(selection.startTime).toISOString(),
+			to: new Date(selection.endTime).toISOString(),
 		});
 
+		setLoadingCoords(true);
 		get(`reports/route?${params.toString()}`)
 			.then(response => {
-				setSelectionCoords(response.data);
-
-				if (!response.data || response.data.length < 2) return;
-				const startCoord = response.data[0];
-				const endCoord = response.data[response.data.length - 1];
-				if (!startCoord || !endCoord) return;
-
-				mapViewRef.current?.animateToRegion(getRegionForCoordinates([startCoord, endCoord]));
+				if (cancelled) return;
+				const coords = Array.isArray(response.data) ? response.data : [];
+				setSelectionCoords(coords);
+				if (coords.length >= 2) {
+					mapViewRef.current?.animateToRegion(getRegionForCoordinates(coords));
+				}
 			})
-			.catch(() => {})
-			.finally(() => setLoadingCoords(false));
-	}, [selection]);
+			.finally(() => !cancelled && setLoadingCoords(false));
 
-	// --- Sub-components ---
-	const RightIconComponent = useCallback(() => (
-		<View style={{ flexDirection: 'row' }}>
-			<TouchableOpacity style={styles.rightHeaderButton} onPress={() => setDisplayPicker(true)}>
-				<FontAwesomeIcon icon={faCalendar} size={20} color={styles.colors.blue.primary} />
-			</TouchableOpacity>
-			<TouchableOpacity style={styles.rightHeaderButton} onPress={downloadReport}>
-				<FontAwesomeIcon icon={faFileArrowDown} size={20} color={styles.colors.blue.primary} />
-			</TouchableOpacity>
-		</View>
-	), [theme, downloadReport]);
+		return () => {
+			cancelled = true;
+			setLoadingCoords(false);
+		};
+	}, [selection, deviceId]);
 
-	const FooterListComponent = useMemo(() => loadingMore && (
+	// --- List parts ---
+	const ListHeaderComponent = useMemo(() => (
+		<TouchableOpacity style={styles.monthBar} onPress={showPicker} accessibilityRole="button" accessibilityLabel="Vybrat měsíc">
+			<FontAwesomeIcon icon={faCalendar} size={15} color={styles.colors.blue.primary} />
+			<Text style={styles.monthText}>{formatMonth(currentDate.firstDay)}</Text>
+		</TouchableOpacity>
+	), [styles, currentDate, showPicker]);
+
+	const ListFooterComponent = useMemo(() => loadingMore && (
 		<View style={styles.empty}>
 			<ActivityIndicator size="small" />
-			<Text style={[styles.text.base, { paddingLeft: 10, marginTop: 8 }]}>Načítání dalších záznamů...</Text>
 		</View>
-	), [loadingMore]);
+	), [styles, loadingMore]);
 
-	const EmptyListComponent = useMemo(() => !loadingMore && !loading && (
-		<View style={styles.empty}>
-			<Text style={[styles.text.note, styles.text.center]}>
-				Pro období od {formatDate(currentDate.firstDayOfMonth)} do {formatDate(currentDate.lastDayOfMonth)} nejsou k dispozici žádné záznamy
-			</Text>
-		</View>
-	), [currentDate, loadingMore, loading]);
+	const ListEmptyComponent = useMemo(() => {
+		if (loading) {
+			return (
+				<View style={styles.empty}>
+					<ActivityIndicator size="large" />
+				</View>
+			);
+		}
 
-	const tripItemRenderer = useCallback(({ item }) => reportItemRenderer({
+		if (error) {
+			return (
+				<View style={styles.empty}>
+					<Text style={styles.errorText}>{error}</Text>
+					<TouchableOpacity onPress={reload} accessibilityRole="button">
+						<Text style={styles.linkText}>Zkusit znovu</Text>
+					</TouchableOpacity>
+				</View>
+			);
+		}
+
+		// lastDayOfMonth is exclusive
+		const lastDay = new Date(+currentDate.lastDayOfMonth - 1);
+		return (
+			<View style={styles.empty}>
+				<Text style={styles.emptyText}>
+					{deviceId
+						? `Pro období od ${formatDate(currentDate.firstDayOfMonth)} do ${formatDate(lastDay)} nejsou k dispozici žádné záznamy`
+						: 'Žádné vozidlo k zobrazení'}
+				</Text>
+			</View>
+		);
+	}, [styles, loading, error, reload, currentDate, deviceId]);
+
+	const renderListItem = useCallback(({ item }) => renderItem({
 		item,
-		setSelection,
-		selection,
-		currentDevice,
 		styles,
+		selection,
+		setSelection,
 		selectionPoint,
-		setSelectionPoint,
 		panToPointMarker,
-	}), [currentDevice, theme, selection, selectionPoint]);
-
-	if (loading || error) {
-		return <LoadingView error={error} />;
-	}
+	}), [renderItem, styles, selection, selectionPoint, panToPointMarker]);
 
 	return (
 		<View style={styles.container}>
@@ -330,33 +411,26 @@ export default ReportView = ({
 				<MapView
 					style={styles.map}
 					ref={mapViewRef}
+					initialRegion={initialRegion}
 					showsUserLocation
 					showsMyLocationButton
 					showsTraffic
 					zoomEnabled
 				>
-					{currentDevice && currentDevicePosition?.latitude && (
-						<DeviceMarker device={{
-							...currentDevice,
-							position: currentDevicePosition,
-							moving: isDeviceMoving({
-								...currentDevice,
-								position: currentDevicePosition,
-							}),
-						}} />
+					{currentDevice?.position && (
+						<DeviceMarker device={currentDevice} />
 					)}
-					{selectionPoint?.latitude && (
-						<Marker coordinate={selectionPoint} identifier="point" pinColor={colors.red} />
+					{selectionPoint?.latitude != null && (
+						<Marker coordinate={selectionPoint} identifier="point" pinColor={START_COLOR} />
 					)}
-					{selectionCoords?.length >= 2 && (<>
-						<Marker coordinate={selectionCoords[0]} identifier="start" pinColor={colors.red} />
+					{selectionCoords.length >= 2 && (<>
+						<Marker coordinate={selectionCoords[0]} identifier="start" pinColor={START_COLOR} />
 						<Polyline
 							coordinates={selectionCoords}
-							strokeColor="#1a1a2e"
-							strokeColors={['#007aff']}
+							strokeColor={colors.blue.primary}
 							strokeWidth={4}
 						/>
-						<Marker coordinate={selectionCoords[selectionCoords.length - 1]} identifier="end" pinColor={colors.violet.primary} />
+						<Marker coordinate={selectionCoords[selectionCoords.length - 1]} identifier="end" pinColor={END_COLOR} />
 					</>)}
 				</MapView>
 				{loadingCoords && (
@@ -370,12 +444,14 @@ export default ReportView = ({
 				style={styles.flatList}
 				data={items}
 				keyExtractor={reportKeyExtractor}
-				renderItem={tripItemRenderer}
-				ListEmptyComponent={EmptyListComponent}
-				ListFooterComponent={FooterListComponent}
+				renderItem={renderListItem}
+				ListHeaderComponent={ListHeaderComponent}
+				ListEmptyComponent={ListEmptyComponent}
+				ListFooterComponent={ListFooterComponent}
 				refreshing={refreshing}
-				onRefresh={onRefresh}
+				onRefresh={deviceId ? onRefresh : undefined}
 				onEndReached={onEndReached}
+				onEndReachedThreshold={0.5}
 			/>
 
 			{displayPicker && (
@@ -397,4 +473,4 @@ export default ReportView = ({
 			</Modal>
 		</View>
 	);
-};
+}

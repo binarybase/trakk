@@ -1,26 +1,21 @@
 import { ScrollView, TouchableOpacity, Text, View, Switch } from "react-native";
-import { useAppContext } from "../lib/context/appContext";
-import { useFocusedTabEffect } from "../lib/hooks/useFocusedTab";
 import { useStyles } from '../style/useStyles';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useAuthContext } from "../lib/context/authContext";
 import { useCallback } from "react";
-import { useCache, useStorage } from "../lib/storage";
+import { useCache } from "../lib/storage";
+import { useTestDeviceSetting } from "../lib/testDevice";
 import { formatSize } from "../lib/formatter";
-import { log } from "../lib/logger";
+import { confirm } from "../lib/alert";
 
-const MODULE = 'SettingsScreen';
-
-export default SettingsScreen = () => {
+export default function SettingsScreen() {
 	const { info, clear } = useCache();
-	const [displayTestDevice, setDisplayTestDevice] = useStorage("displayTestDevice", true);
+	const [displayTestDevice, setDisplayTestDevice] = useTestDeviceSetting();
 	const { userEmail, logout } = useAuthContext();
 	const h = useHeaderHeight();
-	const { setHeaderLeft, setHeaderTitle, setHeaderRight } = useAppContext();
 	const [styles] = useStyles(s => ({
 		view: {
 			flex: 1,
-			marginTop: h,
 		},
 		section: {
 			marginTop: 24,
@@ -31,11 +26,14 @@ export default SettingsScreen = () => {
 			paddingHorizontal: 4,
 			marginBottom: 8,
 		},
+		sectionFooter: {
+			...s.list.footer,
+			paddingHorizontal: 4,
+		},
 		card: {
 			backgroundColor: s.cardBg,
 			borderRadius: 14,
 			overflow: 'hidden',
-			marginBottom: 16,
 		},
 		row: {
 			flexDirection: 'row',
@@ -54,12 +52,15 @@ export default SettingsScreen = () => {
 		},
 		rowValue: {
 			...s.text.base,
-			color: s.colors.gray[s.colors.base.dark === s.fg ? 'dark' : 'light'],
+			color: s.muted,
 		},
 		userInfo: {
 			...s.text.note,
 			textAlign: 'center',
 			marginBottom: 8,
+		},
+		logoutSection: {
+			marginTop: 32,
 		},
 		logoutBtn: {
 			...s.btn.btn,
@@ -82,20 +83,15 @@ export default SettingsScreen = () => {
 		},
 	}));
 
-	useFocusedTabEffect(isFocused => {
-		if (!isFocused) return;
-		setHeaderLeft(false);
-		setHeaderTitle("Nastavení");
-		setHeaderRight(null);
-	});
-
 	const onLogoutPress = useCallback(() => {
-		log(MODULE, 'logging out user');
-		logout();
-	}, []);
+		confirm({
+			title: 'Odhlásit se',
+			message: 'Odhlášení vymaže uložená data aplikace.',
+		}).then(logout, () => {});
+	}, [logout]);
 
 	return (
-		<ScrollView style={styles.view} contentInsetAdjustmentBehavior="automatic">
+		<ScrollView style={[styles.view, { marginTop: h }]} contentInsetAdjustmentBehavior="automatic">
 			<View style={styles.section}>
 				<Text style={styles.userInfo}>Přihlášen jako {userEmail}</Text>
 			</View>
@@ -105,9 +101,10 @@ export default SettingsScreen = () => {
 				<View style={styles.card}>
 					<View style={styles.row}>
 						<Text style={styles.rowText}>Zobrazit demo jednotku</Text>
-						<Switch value={displayTestDevice} onValueChange={() => setDisplayTestDevice(!displayTestDevice)} />
+						<Switch value={displayTestDevice} onValueChange={setDisplayTestDevice} />
 					</View>
 				</View>
+				<Text style={styles.sectionFooter}>Simulované vozidlo</Text>
 			</View>
 
 			<View style={styles.section}>
@@ -126,11 +123,11 @@ export default SettingsScreen = () => {
 				</View>
 			</View>
 
-			<View style={[styles.section, { marginTop: 32 }]}>
+			<View style={[styles.section, styles.logoutSection]}>
 				<TouchableOpacity style={styles.logoutBtn} onPress={onLogoutPress} activeOpacity={0.7}>
 					<Text style={styles.logoutBtnText}>Odhlásit se</Text>
 				</TouchableOpacity>
 			</View>
 		</ScrollView>
 	);
-};
+}

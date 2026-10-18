@@ -1,104 +1,83 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createDrawerNavigator, DrawerToggleButton } from '@react-navigation/drawer';
 import LocationScreen from './LocationScreen';
 import TripsScreen from './TripsScreen';
 import StopsScreen from './StopsScreen';
 import SettingsScreen from './SettingsScreen';
 import LeftPanel from './components/LeftPanel';
+import HeaderTitle from './components/HeaderTitle';
 
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMap } from '@fortawesome/free-solid-svg-icons/faMap';
-import { faRoad } from '@fortawesome/free-solid-svg-icons/faRoad';
-import { faCircleStop } from '@fortawesome/free-solid-svg-icons/faCircleStop';
+import { faRoute } from '@fortawesome/free-solid-svg-icons/faRoute';
+import { faSquareParking } from '@fortawesome/free-solid-svg-icons/faSquareParking';
 import { faGear } from '@fortawesome/free-solid-svg-icons/faGear';
 
+import { useMemo } from 'react';
 import { useStyles } from '../style/useStyles';
-import { useCallback, useState } from 'react';
-import { AppContext } from '../lib/context/appContext';
-import { useTabNavigator } from '../lib/hooks/useFocusedTab';
-import { useColorScheme } from 'react-native';
 
 const Tab = createBottomTabNavigator();
 const Drawer = createDrawerNavigator();
 
+const tabIcon = (icon) => ({ color }) => <FontAwesomeIcon icon={icon} size={22} color={color} />;
+const renderHeaderTitle = (props) => <HeaderTitle {...props} />;
+const renderDrawerToggle = (props) => <DrawerToggleButton {...props} />;
+const renderDrawerContent = (props) => <LeftPanel {...props} />;
+
+// the map is full screen with floating controls
+const MAP_OPTIONS = { headerShown: false, tabBarIcon: tabIcon(faMap), tabBarAccessibilityLabel: 'Mapa' };
+const TRIPS_OPTIONS = { title: 'Trasy', tabBarIcon: tabIcon(faRoute), tabBarAccessibilityLabel: 'Trasy' };
+const STOPS_OPTIONS = { title: 'Zastávky', tabBarIcon: tabIcon(faSquareParking), tabBarAccessibilityLabel: 'Zastávky' };
+// settings don't depend on the selected vehicle, so there is no drawer toggle
+const SETTINGS_OPTIONS = { title: 'Nastavení', headerLeft: () => null, tabBarIcon: tabIcon(faGear), tabBarAccessibilityLabel: 'Nastavení' };
+
+const DRAWER_OPTIONS = { headerShown: false, swipeEnabled: true };
+const DRAWER_RADIUS = 28;
+
+/**
+ * each tab owns its header; report tabs add the vehicle name and their buttons
+ */
 const TabNavigator = () => {
-	const { TabNavigatorContext, onTabPress, currentTab } = useTabNavigator();
 	const [styles] = useStyles();
-
-	const TabIcon = useCallback(
-		({ focused, icon }) => (
-			<FontAwesomeIcon icon={icon} size={22} color={focused ? styles.colors.blue.primary : styles.fg} />
-		),
-		[styles]
-	);
+	const screenOptions = useMemo(() => ({
+		headerTitle: renderHeaderTitle,
+		headerLeft: renderDrawerToggle,
+		headerTransparent: true,
+		headerBackgroundContainerStyle: {
+			backgroundColor: styles.isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.85)',
+		},
+		tabBarShowLabel: false,
+		tabBarActiveTintColor: styles.colors.blue.primary,
+		tabBarInactiveTintColor: styles.muted,
+	}), [styles]);
 
 	return (
-		<TabNavigatorContext.Provider value={{ currentTab }}>
-			<Tab.Navigator
-				screenListeners={{ tabPress: onTabPress }}
-				screenOptions={{
-					headerShown: false,
-					tabBarShowLabel: false,
-				}}
-			>
-				<Tab.Screen
-					name="Mapa"
-					component={LocationScreen}
-					options={{ tabBarIcon: (props) => <TabIcon icon={faMap} {...props} /> }}
-				/>
-				<Tab.Screen
-					name="Trasy"
-					component={TripsScreen}
-					options={{ tabBarIcon: (props) => <TabIcon icon={faRoad} {...props} /> }}
-				/>
-				<Tab.Screen
-					name="Zastávky"
-					component={StopsScreen}
-					options={{ tabBarIcon: (props) => <TabIcon icon={faCircleStop} {...props} /> }}
-				/>
-				<Tab.Screen
-					name="Nastavení"
-					component={SettingsScreen}
-					options={{ tabBarIcon: (props) => <TabIcon icon={faGear} {...props} /> }}
-				/>
-			</Tab.Navigator>
-		</TabNavigatorContext.Provider>
+		<Tab.Navigator screenOptions={screenOptions}>
+			<Tab.Screen name="Mapa" component={LocationScreen} options={MAP_OPTIONS} />
+			<Tab.Screen name="Trasy" component={TripsScreen} options={TRIPS_OPTIONS} />
+			<Tab.Screen name="Zastávky" component={StopsScreen} options={STOPS_OPTIONS} />
+			<Tab.Screen name="Nastavení" component={SettingsScreen} options={SETTINGS_OPTIONS} />
+		</Tab.Navigator>
 	);
 };
 
-export default () => {
-	const theme = useColorScheme();
-	const [headerLeft, setHeaderLeft] = useState();
-	const [headerTitle, setHeaderTitle] = useState();
-	const [headerRight, setHeaderRight] = useState();
+export default function HomeScreen() {
+	const [styles] = useStyles();
+	const screenOptions = useMemo(() => ({
+		drawerType: 'front',
+		overlayColor: 'rgba(0,0,0,0.3)',
+		drawerStyle: {
+			width: '86%',
+			backgroundColor: styles.isDark ? styles.bg : styles.cardBg,
+			borderTopRightRadius: DRAWER_RADIUS,
+			borderBottomRightRadius: DRAWER_RADIUS,
+			overflow: 'hidden',
+		},
+	}), [styles]);
 
 	return (
-		<AppContext.Provider value={{
-			headerLeft,
-			setHeaderLeft,
-			headerTitle,
-			setHeaderTitle,
-			headerRight,
-			setHeaderRight,
-		}}>
-			<Drawer.Navigator
-				drawerContent={(props) => <LeftPanel {...props} />}
-			>
-				<Drawer.Screen
-					name="Trakk"
-					component={TabNavigator}
-					options={{
-						swipeEnabled: true,
-						headerTitle,
-						headerRight,
-						headerTransparent: true,
-						headerBackgroundContainerStyle: {
-							backgroundColor: theme === 'light' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.6)',
-						},
-						...(headerLeft === false ? { headerLeft: null } : {}),
-					}}
-				/>
-			</Drawer.Navigator>
-		</AppContext.Provider>
+		<Drawer.Navigator drawerContent={renderDrawerContent} screenOptions={screenOptions}>
+			<Drawer.Screen name="Trakk" component={TabNavigator} options={DRAWER_OPTIONS} />
+		</Drawer.Navigator>
 	);
-};
+}

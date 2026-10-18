@@ -1,54 +1,58 @@
 import { TouchableOpacity, View, Text } from "react-native";
-import ReportView from "./components/ReportView";
-import { formatDistance, formatDistanceKm, formatSpeed } from '../lib/formatter';
-import { durationBetweenDates, formatDateTime, formatDuration } from "../lib/date";
 import { memo, useCallback } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
+import { faCircleInfo } from "@fortawesome/free-solid-svg-icons/faCircleInfo";
+import ReportView, { END_COLOR, START_COLOR } from "./components/ReportView";
+import AddressLine from "./components/AddressLine";
+import { formatDistance } from '../lib/formatter';
+import { durationBetweenDates, formatDuration, formatShortDate, formatShortTime } from "../lib/date";
 
-const TripItem = memo(({ navigate, item, selection, setSelection, currentDevice, styles }) => {
-	const onItemLongPress = () => {
-		navigate("TripInfoScreen", {
-			trip: item
-		})
-	}
+const TripItem = memo(({ item, selected, onSelect, onInfo, styles }) => (
+	<TouchableOpacity
+		onPress={() => onSelect(item)}
+		onLongPress={() => onInfo(item)}
+		style={[styles.listItem, selected && styles.listItemSelected]}
+	>
+		<View style={styles.rowMain}>
+			<Text style={styles.rowTitle}>
+				{formatShortDate(item.startTime)} · {formatShortTime(item.startTime)} – {formatShortTime(item.endTime)}
+			</Text>
+			<AddressLine color={START_COLOR} text={item.startAddress} styles={styles} />
+			<AddressLine color={END_COLOR} text={item.endAddress} styles={styles} />
+		</View>
+		<View style={styles.rowAside}>
+			<Text style={styles.rowValue}>{formatDistance(item.distance)}</Text>
+			<Text style={styles.rowMeta}>{formatDuration(durationBetweenDates(item.endTime, item.startTime))}</Text>
+			<TouchableOpacity
+				style={styles.rowButton}
+				onPress={() => onInfo(item)}
+				hitSlop={10}
+				accessibilityRole="button"
+				accessibilityLabel="Detail trasy"
+			>
+				<FontAwesomeIcon icon={faCircleInfo} size={16} color={styles.colors.blue.primary} />
+			</TouchableOpacity>
+		</View>
+	</TouchableOpacity>
+));
 
-	const onItemPress = () => {
-		setSelection(item);
-	}
-
-	return (
-		<TouchableOpacity
-			onLongPress={onItemLongPress}
-			onPress={onItemPress}
-			style={[
-				styles.listItem,
-				{...(selection?.startTime === item.startTime ? styles.listItemSelected : {})}
-			]}
-		>
-			<View style={{ width: 100 }}>
-				<Text style={styles.text.base}>{formatDateTime(item.startTime)}</Text>
-				<Text style={styles.text.base}>{formatDateTime(item.endTime)}</Text>
-			</View>
-			<View style={{ width: 80 }}>
-				<Text style={styles.text.base}>{currentDevice?.position?.protocol === 'teltonika' ? formatDistanceKm(item.distance) : formatDistance(item.distance)}</Text>
-				<Text style={styles.text.base}>{formatDuration(durationBetweenDates(item.endTime, item.startTime))}</Text>
-			</View>
-			<View>
-				<Text style={styles.text.base}>{item.startAddress}</Text>
-				<Text style={styles.text.base}>{item.endAddress}</Text>
-			</View>
-		</TouchableOpacity>
-	);
-});
-
-export default ({ navigation }) => {
-	const itemRenderer = useCallback((props) => <TripItem {...props} navigate={navigation.navigate} />, [ navigation ]);
+export default function TripsScreen({ navigation }) {
+	const renderItem = useCallback(({ item, styles, selection, setSelection }) => (
+		<TripItem
+			item={item}
+			styles={styles}
+			selected={selection?.startTime === item.startTime}
+			onSelect={setSelection}
+			onInfo={(trip) => navigation.navigate('TripInfoScreen', { trip })}
+		/>
+	), [navigation]);
 
 	return (
 		<ReportView
 			reportType="cachedTrips.php"
-			downloadReportType={"trips"}
+			downloadReportType="trips"
 			reportTitle="Trasy"
-			reportItemRenderer={itemRenderer}
+			renderItem={renderItem}
 		/>
 	);
 }

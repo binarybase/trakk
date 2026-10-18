@@ -2,7 +2,7 @@ import { KeyboardAvoidingView, View, Text, TextInput, TouchableOpacity, Dimensio
 import { useAuthContext, AUTH_STATUS } from "../lib/context/authContext";
 import { useStyles } from '../style/useStyles';
 import { isEmpty } from '../lib/util';
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { faLocationArrow } from "@fortawesome/free-solid-svg-icons/faLocationArrow";
@@ -16,7 +16,7 @@ const invalidCredentialsText = "Neplatné přihlašovací údaje.";
 const requestFailedText = "Přihlášení selhalo.";
 const networkErrorText = 'Chyba připojení';
 
-export default Login = () => {
+export default function LoginScreen() {
 	const screenH = Dimensions.get('screen').height;
 	const h = useHeaderHeight();
 	const [styles] = useStyles(s => ({
@@ -73,6 +73,7 @@ export default Login = () => {
 	const [hasError, setHasError] = useState(false);
 	const [errorText, setErrorText] = useState('');
 	const { authStrategy } = useAuthContext();
+	const passwordRef = useRef();
 
 	const validateForm = () => {
 		if (isEmpty(inputEmail) || isEmpty(inputPw)) {
@@ -128,15 +129,24 @@ export default Login = () => {
 					placeholderTextColor={styles.colors.gray.light}
 					autoFocus
 					autoCapitalize="none"
+					autoCorrect={false}
 					keyboardType="email-address"
+					textContentType="username"
+					autoComplete="email"
+					returnKeyType="next"
+					onSubmitEditing={() => passwordRef.current?.focus()}
 					onChangeText={setInputEmail}
 					value={inputEmail}
 				/>
 				<TextInput
+					ref={passwordRef}
 					style={styles.input}
 					placeholder={pwText}
 					placeholderTextColor={styles.colors.gray.light}
 					secureTextEntry
+					textContentType="password"
+					autoComplete="password"
+					returnKeyType="go"
 					onSubmitEditing={doLoginProcess}
 					onChangeText={setInputPw}
 					value={inputPw}
@@ -153,4 +163,4 @@ export default Login = () => {
 			</View>
 		</KeyboardAvoidingView>
 	);
-};
+}

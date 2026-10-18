@@ -1,105 +1,134 @@
-import { useStyles } from "../../style/useStyles";
-import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
-import { faLocationDot } from "@fortawesome/free-solid-svg-icons/faLocationDot";
-import { faArrowRight } from "@fortawesome/free-solid-svg-icons/faArrowRight";
-import { faGear } from "@fortawesome/free-solid-svg-icons/faGear";
+import { memo } from 'react';
 import { View, Text, TouchableOpacity } from "react-native";
-import { COLOR_DRIVING, COLOR_STANDING } from "../../lib/constants";
-import { activityFormatter, formatDistance, formatVoltage, formatSpeed } from "../../lib/formatter";
-import { faRulerHorizontal } from "@fortawesome/free-solid-svg-icons/faRulerHorizontal";
-import { faCarBattery } from "@fortawesome/free-solid-svg-icons/faCarBattery";
+import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { faRoadBarrier } from "@fortawesome/free-solid-svg-icons/faRoadBarrier";
-import { faCloud } from "@fortawesome/free-solid-svg-icons/faCloud";
+import { faUnlockKeyhole } from "@fortawesome/free-solid-svg-icons/faUnlockKeyhole";
+import { faLock } from "@fortawesome/free-solid-svg-icons/faLock";
+import { faCircleInfo } from "@fortawesome/free-solid-svg-icons/faCircleInfo";
+import { useStyles } from "../../style/useStyles";
+import VehiclePuck from './VehiclePuck';
+import VehicleMetrics from './VehicleMetrics';
+import { deviceState, deviceStatusLabel, STATE_COLORS } from "../../lib/deviceStatus";
+import { activityFormatter } from "../../lib/formatter";
 import { alert, confirm, emptyAction } from '../../lib/alert';
 import { post } from "../../lib/request";
-import { faUnlockKeyhole } from "@fortawesome/free-solid-svg-icons/faUnlockKeyhole";
-import { memo } from 'react';
-import { faInfoCircle } from "@fortawesome/free-solid-svg-icons/faInfoCircle";
-import { faPause } from "@fortawesome/free-solid-svg-icons/faPause";
-import { isBool } from "../../lib/util";
 
-const ICON_SIZE = 13;
+// trackers that understand the RELAY command
+const ENGINE_BLOCK_PROTOCOLS = ['gt06'];
 
-export const DeviceItem = memo(({ navigate, device, color, focused, isEngineBlocked, blockedDevices, setBlockedDevices }) => {
+const IconButton = ({ icon, color, onPress, label, styles }) => (
+	<TouchableOpacity
+		onPress={onPress}
+		style={styles.iconButton}
+		hitSlop={6}
+		activeOpacity={0.6}
+		accessibilityRole="button"
+		accessibilityLabel={label}
+	>
+		<FontAwesomeIcon icon={icon} size={15} color={color} />
+	</TouchableOpacity>
+);
+
+/**
+ * vehicle row of the side panel
+ */
+export const DeviceItem = memo(({ device, selected, isEngineBlocked, setBlockedDevices, onPress, onInfoPress }) => {
 	const [styles] = useStyles(s => ({
-		container: {
-			paddingHorizontal: 16,
-			paddingVertical: 14,
-		},
-		header: {
+		row: {
 			flexDirection: 'row',
-			alignItems: 'flex-start',
-			justifyContent: 'space-between',
-			marginBottom: 10,
+			padding: 12,
+			borderRadius: 18,
+			backgroundColor: s.isDark ? s.cardBg : s.bg,
 		},
-		nameColumn: {
-			flexDirection: 'column',
-			gap: 4,
+		rowSelected: {
+			backgroundColor: s.colors.blue.secondary,
+			borderWidth: 1.5,
+			borderColor: s.colors.blue.primary,
+			padding: 10.5,
+		},
+		body: {
 			flex: 1,
-			marginRight: 8,
+			marginLeft: 12,
 		},
-		statusRow: {
+		titleRow: {
 			flexDirection: 'row',
-			alignItems: 'center',
+			alignItems: 'baseline',
 		},
-		statusIcon: {
-			marginRight: 6,
-		},
-		statusText: {
-			fontSize: 13,
-			fontWeight: '600',
-		},
-		deviceName: {
+		name: {
 			fontSize: 17,
 			fontWeight: '600',
 			color: s.fg,
+			flexShrink: 1,
 		},
-		detailRow: {
+		model: {
+			fontSize: 13,
+			fontWeight: '600',
+			color: s.muted,
+			marginLeft: 6,
+			flexShrink: 1,
+		},
+		age: {
+			fontSize: 13,
+			color: s.muted,
+			marginLeft: 'auto',
+			paddingLeft: 8,
+		},
+		status: {
+			fontSize: 14,
+			fontWeight: '600',
+			marginTop: 2,
+		},
+		address: {
+			fontSize: 13,
+			color: s.muted,
+			marginTop: 2,
+		},
+		badge: {
 			flexDirection: 'row',
 			alignItems: 'center',
-			marginBottom: 6,
+			alignSelf: 'flex-start',
+			marginTop: 6,
+			paddingHorizontal: 8,
+			paddingVertical: 3,
+			borderRadius: 8,
+			backgroundColor: 'rgba(255,59,48,0.14)',
 		},
-		detailText: {
-			fontSize: 13,
-			color: s.colors.gray[s.colors.base.dark === s.fg ? 'dark' : 'light'],
-			marginLeft: 8,
+		badgeText: {
+			fontSize: 12,
+			fontWeight: '700',
+			color: s.colors.red,
+			marginLeft: 5,
+		},
+		footer: {
+			flexDirection: 'row',
+			alignItems: 'flex-end',
+			marginTop: 6,
+		},
+		metrics: {
+			flex: 1,
 		},
 		actions: {
 			flexDirection: 'row',
-			alignItems: 'center',
+			marginLeft: 8,
 		},
-		actionBtn: {
-			height: 34,
-			width: 34,
-			borderRadius: 10,
+		iconButton: {
+			width: 32,
+			height: 32,
+			borderRadius: 16,
+			alignItems: 'center',
 			justifyContent: 'center',
-			alignItems: 'center',
-			backgroundColor: s.colors.opacity01[s.colors.base.dark === s.fg ? 'dark' : 'light'],
+			backgroundColor: s.listBg,
 			marginLeft: 6,
-		},
-		blockLabel: {
-			color: s.fg,
-			fontSize: 12,
-			fontWeight: '500',
-			marginRight: 4,
 		},
 	}));
 
-	const canBlockEngine = device.position?.protocol === 'gt06';
-	const isMoving = device.moving;
-	const TEXT_COLOR = isMoving ? COLOR_DRIVING : COLOR_STANDING;
-	const odometer = device.position?.attributes?.odometer * 1000 || device.position?.attributes?.totalDistance;
-	const ignition = device.position?.attributes?.ignition;
-
-	const onDeviceInfoPress = () => {
-		navigate && navigate("DeviceInfoScreen", { device });
-	};
+	const color = STATE_COLORS[deviceState(device)];
+	const canBlockEngine = ENGINE_BLOCK_PROTOCOLS.includes(device.position?.protocol);
 
 	const onEngineBlockPress = () => {
-		if (!canBlockEngine) return;
 		confirm({
 			title: isEngineBlocked ? 'Odblokování motoru' : 'Blokace motoru',
-			message: 'Potvrďte prosím provedení akce',
+			message: `${device.name}: potvrďte prosím provedení akce`,
 		}).then(() => {
 			post('commands/send', {
 				deviceId: device.id,
@@ -110,88 +139,66 @@ export const DeviceItem = memo(({ navigate, device, color, focused, isEngineBloc
 					data: `RELAY,${isEngineBlocked ? '0' : '1'}#`,
 				},
 			}).then(response => {
-				if (response.status === 200) {
-					alert("Příkaz byl odeslán!");
-				} else {
+				if (response.status !== 200) {
 					alert("Odeslání příkazu selhalo.");
+					return;
 				}
 
-				if (isEngineBlocked) {
-					setBlockedDevices(blockedDevices.filter(d => d !== device.id));
-				} else {
-					setBlockedDevices([...blockedDevices, device.id]);
-				}
+				alert("Příkaz byl odeslán!");
+				setBlockedDevices(blocked => isEngineBlocked
+					? blocked.filter(id => id !== device.id)
+					: [...blocked, device.id]);
 			});
 		}).catch(emptyAction);
 	};
 
 	return (
-		<View style={styles.container}>
-			<View style={styles.header}>
-				<View style={styles.nameColumn}>
-					<View style={styles.statusRow}>
-						<FontAwesomeIcon
-							icon={isMoving ? faArrowRight : faPause}
-							color={TEXT_COLOR}
-							size={12}
-							style={styles.statusIcon}
-						/>
-						<Text style={[styles.statusText, { color: TEXT_COLOR }]}>
-							{isMoving ? formatSpeed(device.position.speed) : activityFormatter(device.position.fixTime, true)}
-						</Text>
-					</View>
-					<Text numberOfLines={1} style={styles.deviceName}>
-						{device.name}
-					</Text>
+		<TouchableOpacity
+			onPress={() => onPress(device)}
+			style={[styles.row, selected && styles.rowSelected]}
+			activeOpacity={0.7}
+			accessibilityRole="button"
+			accessibilityState={{ selected: !!selected }}
+		>
+			<VehiclePuck device={device} size={38} />
+			<View style={styles.body}>
+				<View style={styles.titleRow}>
+					<Text numberOfLines={1} style={styles.name}>{device.name}</Text>
+					{!!device.model && <Text numberOfLines={1} style={styles.model}>{device.model}</Text>}
+					{!!device.position?.fixTime && <Text style={styles.age}>{activityFormatter(device.position.fixTime, true)}</Text>}
 				</View>
-
-				<View style={styles.actions}>
-					{canBlockEngine && (
-						<TouchableOpacity onPress={onEngineBlockPress} style={styles.actionBtn} activeOpacity={0.6}>
-							{isEngineBlocked && <Text style={styles.blockLabel}>Odblokovat</Text>}
-							<FontAwesomeIcon icon={isEngineBlocked ? faUnlockKeyhole : faRoadBarrier} size={15} color={styles.fg} />
-						</TouchableOpacity>
-					)}
-					<TouchableOpacity onPress={onDeviceInfoPress} style={styles.actionBtn} activeOpacity={0.6}>
-						<FontAwesomeIcon icon={faInfoCircle} size={15} color={styles.fg} />
-					</TouchableOpacity>
+				<Text style={[styles.status, { color }]}>{deviceStatusLabel(device)}</Text>
+				{!!device.position?.address && (
+					<Text numberOfLines={1} style={styles.address}>{device.position.address}</Text>
+				)}
+				{isEngineBlocked && (
+					<View style={styles.badge}>
+						<FontAwesomeIcon icon={faLock} size={10} color={styles.colors.red} />
+						<Text style={styles.badgeText}>Motor blokován</Text>
+					</View>
+				)}
+				<View style={styles.footer}>
+					<VehicleMetrics device={device} color={styles.fg} size={12} style={styles.metrics} />
+					<View style={styles.actions}>
+						{canBlockEngine && (
+							<IconButton
+								icon={isEngineBlocked ? faUnlockKeyhole : faRoadBarrier}
+								color={styles.colors.red}
+								onPress={onEngineBlockPress}
+								label={isEngineBlocked ? 'Odblokovat motor' : 'Zablokovat motor'}
+								styles={styles}
+							/>
+						)}
+						<IconButton
+							icon={faCircleInfo}
+							color={styles.colors.blue.primary}
+							onPress={() => onInfoPress(device)}
+							label="Detail vozidla"
+							styles={styles}
+						/>
+					</View>
 				</View>
 			</View>
-
-			{device.position?.address && (
-				<View style={styles.detailRow}>
-					<FontAwesomeIcon icon={faLocationDot} color={styles.fg} size={ICON_SIZE} />
-					<Text numberOfLines={1} style={styles.detailText}>{device.position.address}</Text>
-				</View>
-			)}
-
-			{odometer > 0 && (
-				<View style={styles.detailRow}>
-					<FontAwesomeIcon icon={faRulerHorizontal} color={styles.fg} size={ICON_SIZE} />
-					<Text numberOfLines={1} style={styles.detailText}>{formatDistance(odometer)}</Text>
-				</View>
-			)}
-
-			{device.position?.attributes?.power && (
-				<View style={styles.detailRow}>
-					<FontAwesomeIcon icon={faCarBattery} color={styles.fg} size={ICON_SIZE} />
-					<Text numberOfLines={1} style={styles.detailText}>{formatVoltage(device.position.attributes.power)}</Text>
-				</View>
-			)}
-
-			{device.status && (
-				<View style={styles.detailRow}>
-					<FontAwesomeIcon icon={faCloud} color={styles.fg} size={ICON_SIZE} />
-					<Text numberOfLines={1} style={styles.detailText}>aktivní {activityFormatter(device.lastUpdate)}</Text>
-				</View>
-			)}
-
-			{isBool(ignition) && (
-				<View style={styles.detailRow}>
-					<FontAwesomeIcon icon={faGear} color={styles.fg} size={ICON_SIZE} />
-					<Text numberOfLines={1} style={styles.detailText}>{ignition === true ? 'zapnuto' : 'vypnuto'}</Text>
-				</View>
-			)}
-		</View>
+		</TouchableOpacity>
 	);
 });

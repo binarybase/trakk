@@ -3,78 +3,67 @@ import { AuthContext, useAuthProvider } from './lib/context/authContext';
 import { DevicesContext, useDevicesProvider } from './lib/context/devicesContext';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
-import LoadingScreen from './screens/LoadingScreen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
 import DeviceInfoScreen from './screens/DeviceInfoScreen';
-import DeviceEventsScreen from './screens/DeviceEventsScreen';
-import 'react-native-gesture-handler';
-import { useStyles } from './style/useStyles';
-import { useColorScheme } from 'react-native';
 import TripInfoScreen from './screens/TripInfoScreen';
+import { useStyles } from './style/useStyles';
 import { initCarPlay } from './lib/carplay';
+import { migrateCache } from './lib/storage';
 
 const Stack = createNativeStackNavigator();
 
+const HIDDEN_HEADER = { headerShown: false };
+const TRIP_INFO_OPTIONS = { title: 'Detail trasy', headerLargeTitle: true };
+
 const App = () => {
 	const authContext = useAuthProvider();
-	const { connected, loggedIn, token } = authContext;
+	const { loggedIn, token } = authContext;
 	const devicesContext = useDevicesProvider(token, loggedIn);
-	const [styles] = useStyles();
-	const theme = useColorScheme();
+	const [styles, theme] = useStyles();
 
-	// Initialize CarPlay listeners once
 	useEffect(() => {
+		// Initialize CarPlay listeners once
 		initCarPlay();
+		migrateCache();
 	}, []);
 
-	const Theme = useMemo(() => ({
+	const navigationTheme = useMemo(() => ({
 		...DefaultTheme,
 		colors: {
 			...DefaultTheme.colors,
 			primary: styles.fg,
 			background: styles.bg,
-			card: styles.colors.opacity01[theme],
+			card: styles.listBg,
 			text: styles.fg,
-			border: styles.colors.gray[theme],
+			border: styles.muted,
 			notification: styles.bg,
 		},
 		dark: theme === 'dark',
 	}), [theme, styles]);
 
+	// a stored session opens the app right away, it is validated in the background
 	return (
-		<AuthContext.Provider value={authContext}>
-			<DevicesContext.Provider value={devicesContext}>
-				<NavigationContainer theme={Theme}>
-					<Stack.Navigator>
-						{!connected ? (
-							<Stack.Screen
-								name="LoadingScreen"
-								component={LoadingScreen}
-								options={{ headerShown: false }}
-							/>
-						) : !loggedIn ? (
-							<Stack.Screen
-								name="Přihlášení"
-								component={LoginScreen}
-								options={{ headerShown: false }}
-							/>
-						) : (
-							<>
-								<Stack.Screen
-									name="HomeScreen"
-									component={HomeScreen}
-									options={{ headerShown: false }}
-								/>
-								<Stack.Screen name="DeviceInfoScreen" component={DeviceInfoScreen} />
-								<Stack.Screen name="DeviceEventsScreen" component={DeviceEventsScreen} />
-								<Stack.Screen name="TripInfoScreen" component={TripInfoScreen} />
-							</>
-						)}
-					</Stack.Navigator>
-				</NavigationContainer>
-			</DevicesContext.Provider>
-		</AuthContext.Provider>
+		<SafeAreaProvider>
+			<AuthContext.Provider value={authContext}>
+				<DevicesContext.Provider value={devicesContext}>
+					<NavigationContainer theme={navigationTheme}>
+						<Stack.Navigator>
+							{!loggedIn ? (
+								<Stack.Screen name="LoginScreen" component={LoginScreen} options={HIDDEN_HEADER} />
+							) : (
+								<>
+									<Stack.Screen name="HomeScreen" component={HomeScreen} options={HIDDEN_HEADER} />
+									<Stack.Screen name="DeviceInfoScreen" component={DeviceInfoScreen} />
+									<Stack.Screen name="TripInfoScreen" component={TripInfoScreen} options={TRIP_INFO_OPTIONS} />
+								</>
+							)}
+						</Stack.Navigator>
+					</NavigationContainer>
+				</DevicesContext.Provider>
+			</AuthContext.Provider>
+		</SafeAreaProvider>
 	);
 };
 

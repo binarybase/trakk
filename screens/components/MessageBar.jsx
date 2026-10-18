@@ -3,7 +3,7 @@ import { useStyles } from "../../style/useStyles";
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { faCircleUp } from "@fortawesome/free-solid-svg-icons";
 
-export default MessageBar = ({ value, onSubmit, setValue }) => {
+export default function MessageBar({ value, onSubmit, setValue }) {
 	const [styles] = useStyles(s => ({
 		view: {
 			flexDirection: 'row',
@@ -49,4 +49,4 @@ export default MessageBar = ({ value, onSubmit, setValue }) => {
 			</TouchableOpacity>
 		</View>
 	);
-};
+}

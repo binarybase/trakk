@@ -8,15 +8,19 @@ import colors from "./colors";
 import { isFunction } from "../lib/util";
 import { useMemo } from "react";
 
+const themed = (pair, theme) => theme === "dark" ? pair.dark : pair.light;
+
 export const useStyles = (styles = {}) => {
 	const theme = useColorScheme();
 	const baseStyles = useMemo(() => ({
+		isDark: theme === "dark",
 		fg: theme === "dark" ? colors.base.dark : colors.base.light,
 		fgInv: theme === "dark" ? colors.base.light : colors.base.dark,
-		bg: theme === "dark" ? colors.container.dark : colors.container.light,
-		cardBg: theme === "dark" ? colors.card.dark : colors.card.light,
-		listBg: theme === "dark" ? colors.opacity01.dark : colors.opacity01.light,
-		separator: theme === "dark" ? colors.separator.dark : colors.separator.light,
+		bg: themed(colors.container, theme),
+		cardBg: themed(colors.card, theme),
+		listBg: themed(colors.opacity01, theme),
+		separator: themed(colors.separator, theme),
+		muted: themed(colors.gray, theme),
 		text: generateTextStyles(theme),
 		btn: generateBtnStyles(theme),
 		content: generateContentStyles(theme),
@@ -25,10 +29,15 @@ export const useStyles = (styles = {}) => {
 		colors
 	}), [ theme ]);
 
-	const sheet = useMemo(() => StyleSheet.create({
-		...(isFunction(styles) ? styles(baseStyles) : styles),
-		...baseStyles
-	}), [ theme ]);
+	const sheet = useMemo(
+		() => StyleSheet.create({
+			...(isFunction(styles) ? styles(baseStyles) : styles),
+			...baseStyles
+		}),
+		// callers pass inline style factories; the sheet only depends on the theme
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[ baseStyles ]
+	);
 
 	return [
 		sheet,

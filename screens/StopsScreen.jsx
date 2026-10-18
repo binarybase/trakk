@@ -1,47 +1,45 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { TouchableOpacity, View, Text } from "react-native";
-import ReportView from "./components/ReportView";
-import { formatDateTime, formatDuration } from "../lib/date";
+import ReportView, { START_COLOR } from "./components/ReportView";
+import AddressLine from "./components/AddressLine";
+import { formatDuration, formatShortDate, formatShortTime } from "../lib/date";
 
-export default () => {
-	const StopsItem = memo(({ item, selectionPoint, panToPointMarker, styles }) => {
-		const onItemPress = () => {
-			panToPointMarker({
-				startTime: item.startTime,
-				latitude: item.latitude,
-				longitude: item.longitude
-			});
-		}
+const StopItem = memo(({ item, selected, onSelect, styles }) => (
+	<TouchableOpacity
+		onPress={() => onSelect(item)}
+		style={[styles.listItem, selected && styles.listItemSelected]}
+	>
+		<View style={styles.rowMain}>
+			<Text style={styles.rowTitle}>
+				{formatShortDate(item.startTime)} · {formatShortTime(item.startTime)} – {formatShortTime(item.endTime)}
+			</Text>
+			<AddressLine color={START_COLOR} text={item.address} styles={styles} />
+		</View>
+		<View style={styles.rowAside}>
+			<Text style={styles.rowValue}>{formatDuration(item.duration)}</Text>
+		</View>
+	</TouchableOpacity>
+));
 
-		return (
-			<TouchableOpacity
-				onPress={onItemPress}
-				style={[
-					styles.listItem,
-					{...(selectionPoint?.startTime === item.startTime ? styles.listItemSelected : {})}
-				]}
-			>
-				<View style={{ width: 100 }}>
-					<Text style={styles.text.base}>{formatDateTime(item.startTime)}</Text>
-					<Text style={styles.text.base}>{formatDateTime(item.endTime)}</Text>
-				</View>
-				<View style={{ width: 80 }}>
-					<Text style={styles.text.base}>{formatDuration(item.duration)}</Text>
-				</View>
-				<View>
-					<Text style={styles.text.base}>{item.address}</Text>
-				</View>
-			</TouchableOpacity>
-		)
-	});
-
-	const itemRenderer = (props) => <StopsItem {...props} />
+export default function StopsScreen() {
+	const renderItem = useCallback(({ item, styles, selectionPoint, panToPointMarker }) => (
+		<StopItem
+			item={item}
+			styles={styles}
+			selected={selectionPoint?.startTime === item.startTime}
+			onSelect={(stop) => panToPointMarker({
+				startTime: stop.startTime,
+				latitude: stop.latitude,
+				longitude: stop.longitude,
+			})}
+		/>
+	), []);
 
 	return (
 		<ReportView
 			reportType="stops"
 			reportTitle="Zastávky"
-			reportItemRenderer={itemRenderer}
+			renderItem={renderItem}
 		/>
-	)
+	);
 }

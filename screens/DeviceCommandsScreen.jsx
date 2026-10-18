@@ -1,23 +1,27 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Text, View } from "react-native";
 import { useStyles } from "../style/useStyles";
 import MessageBar from "./components/MessageBar";
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import { faArrowLeft, faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { useStorage } from "../lib/storage";
-import deviceInfoContext from "../lib/context/deviceInfoContext";
+import { useDeviceInfo } from "../lib/context/deviceInfoContext";
 import { formatTime, now } from "../lib/date";
 import { isEmpty } from "../lib/util";
 import { alert } from "../lib/alert";
 import { get, post } from "../lib/request";
+import { error as logError } from "../lib/logger";
 import { useHeaderHeight } from '@react-navigation/elements';
 
-const keyExtractor = item => item.ts;
+const keyExtractor = item => String(item.ts);
+// console history kept per device
+const MAX_HISTORY = 100;
 
-export default DeviceCommands = () => {
+export default function DeviceCommandsScreen() {
 	const h = useHeaderHeight();
-	const { device } = useContext(deviceInfoContext);
-	const [styles, theme] = useStyles(s => ({
+	const device = useDeviceInfo();
+	const deviceId = device.id;
+	const [styles] = useStyles(s => ({
 		view: {
 			flex: 1,
 			backgroundColor: s.bg,
@@ -43,6 +47,12 @@ export default DeviceCommands = () => {
 			flexDirection: 'row',
 			alignItems: 'center',
 			marginBottom: 4,
+		},
+		msgHeaderSent: {
+			justifyContent: 'flex-start',
+		},
+		msgHeaderRecv: {
+			justifyContent: 'flex-end',
 		},
 		msgTime: {
 			...s.text.caption,
@@ -74,7 +84,7 @@ export default DeviceCommands = () => {
 		},
 	}));
 
-	const [commands, setCommands] = useStorage(`cmds_${device.id}`, []);
+	const [commands, setCommands] = useStorage(`cmds_${deviceId}`, []);
 	const [value, setValue] = useState();
 	const [error, setError] = useState(false);
 
@@ -82,7 +92,7 @@ export default DeviceCommands = () => {
 		const isSent = item.type === 'sent';
 		return (
 			<View style={styles.msgContainer}>
-				<View style={[styles.msgHeader, { justifyContent: isSent ? 'flex-start' : 'flex-end' }]}>
+				<View style={[styles.msgHeader, isSent ? styles.msgHeaderSent : styles.msgHeaderRecv]}>
 					<Text style={styles.msgTime}>{formatTime(item.ts)}</Text>
 					<FontAwesomeIcon
 						icon={isSent ? faArrowRight : faArrowLeft}
@@ -96,21 +106,21 @@ export default DeviceCommands = () => {
 				</View>
 			</View>
 		);
-	}, [theme]);
+	}, [styles]);
 
 	const sendCommand = useCallback(() => {
 		if (isEmpty(value)) return;
 
-		setValue();
-
 		post('commands/send', {
-			deviceId: device.id,
+			deviceId,
 			id: 0,
 			textChannel: false,
 			type: 'custom',
 			attributes: { data: value },
 		}).then(response => {
 			if (response.status === 200) {
+				// clear the input only once sent, a failed command can be retried
+				setValue();
 				setCommands(cmds => ([
 					{
 						ts: now(),
@@ -118,18 +128,16 @@ export default DeviceCommands = () => {
 						value,
 					},
 					...cmds,
-				]));
+				].slice(0, MAX_HISTORY)));
 			} else {
 				alert("Odeslání příkazu selhalo.");
 			}
 		});
-	}, [value, device]);
+	}, [value, deviceId, setCommands]);
 
 	useEffect(() => {
-		if (!device) return;
-
 		const params = (new URLSearchParams({
-			deviceId: device.id,
+			deviceId,
 			type: "commandResult",
 		})).toString();
 
@@ -140,7 +148,12 @@ export default DeviceCommands = () => {
 			const query = `${params}&from=${from}&to=${to}`;
 
 			try {
-				const events = (await get(`reports/events?${query}`))?.data || [];
+				const response = await get(`reports/events?${query}`);
+				if (response.status !== 200) {
+					setError(true);
+					return;
+				}
+				const events = response.data || [];
 
 				setCommands(cmds => {
 					const eventsToAdd = events
@@ -156,12 +169,12 @@ export default DeviceCommands = () => {
 							value: event.attributes.result,
 						}));
 
-					return eventsToAdd.length ? [...eventsToAdd, ...cmds] : cmds;
+					return eventsToAdd.length ? [...eventsToAdd, ...cmds].slice(0, MAX_HISTORY) : cmds;
 				});
 
 				setError(false);
 			} catch (ex) {
-				console.error("console exception", ex);
+				logError('DeviceCommands', 'fetching command results failed', ex);
 				setError(true);
 			}
 		};
@@ -169,13 +182,13 @@ export default DeviceCommands = () => {
 		const id = setInterval(fetchCommands, 10000);
 		fetchCommands();
 		return () => clearInterval(id);
-	}, [device]);
+	}, [deviceId, setCommands]);
 
 	return (
 		<View style={styles.view}>
 			{error && (
 				<View style={styles.errorBanner}>
-					<Text style={styles.errorText}>Nelze načíst konzoli pro zařízení {device.id}</Text>
+					<Text style={styles.errorText}>Nelze načíst odpovědi zařízení</Text>
 				</View>
 			)}
 			<FlatList
@@ -190,4 +203,4 @@ export default DeviceCommands = () => {
 			</KeyboardAvoidingView>
 		</View>
 	);
-};
+}
